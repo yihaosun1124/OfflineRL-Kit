@@ -7,6 +7,7 @@ import gym
 
 from typing import Optional, Dict, List
 from tqdm import tqdm
+from collections import deque
 from common.buffer import ReplayBuffer
 from common.logger import Logger
 from policy import BasePolicy
@@ -41,10 +42,11 @@ class MFPolicyTrainer:
             self._obs_mean, self._obs_std = self.buffer.normalize_obs()
         self.lr_scheduler = lr_scheduler
 
-    def train(self):
+    def train(self) -> Dict[str, float]:
         start_time = time.time()
 
         num_timesteps = 0
+        last_10_performance = deque(maxlen=10)
         # train loop
         for e in range(1, self._epoch + 1):
 
@@ -70,6 +72,7 @@ class MFPolicyTrainer:
             ep_length_mean, ep_length_std = np.mean(eval_info["eval/episode_length"]), np.std(eval_info["eval/episode_length"])
             norm_ep_rew_mean = self.eval_env.get_normalized_score(ep_reward_mean) * 100
             norm_ep_rew_std = self.eval_env.get_normalized_score(ep_reward_std) * 100
+            last_10_performance.append(norm_ep_rew_mean)
             self.logger.logkv("eval/normalized_episode_reward", norm_ep_rew_mean)
             self.logger.logkv("eval/normalized_episode_reward_std", norm_ep_rew_std)
             self.logger.logkv("eval/episode_length", ep_length_mean)
@@ -83,6 +86,8 @@ class MFPolicyTrainer:
         self.logger.log("total time: {:.2f}s".format(time.time() - start_time))
         torch.save(self.policy.state_dict(), os.path.join(self.logger.model_dir, "policy.pth"))
         self.logger.close()
+
+        return {"last_10_performance": np.mean(last_10_performance)}
 
     def _evaluate(self) -> Dict[str, List[float]]:
         self.policy.eval()
