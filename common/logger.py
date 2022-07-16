@@ -365,4 +365,4 @@ def load_args(load_path: str) -> argparse.ArgumentParser:
     args_dict = vars(args)
     with open(load_path,'r') as f:
         args_dict.update(json.load(f))
-    return args
+    return argparse.Namespace(**args_dict)
