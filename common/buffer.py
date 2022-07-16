@@ -90,7 +90,8 @@ class ReplayBuffer:
         std = self.observations.std(0, keepdims=True) + eps
         self.observations = (self.observations - mean) / std
         self.next_observations = (self.next_observations - mean) / std
-        self.obs_mean, self.obs_std = mean, std
+        obs_mean, obs_std = mean, std
+        return obs_mean, obs_std
     
     def normalize_reward(self) -> None:
         terminals_float = np.zeros_like(self.rewards)

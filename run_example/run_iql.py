@@ -9,7 +9,7 @@ import d4rl
 import numpy as np
 import torch
 
-sys.path.append("..")
+sys.path.append(".")
 
 from common.nets.mlp import MLP
 from common.modules import ActorProb, Critic, DiagGaussian

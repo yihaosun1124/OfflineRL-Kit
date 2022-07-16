@@ -9,7 +9,7 @@ import d4rl
 import numpy as np
 import torch
 
-sys.path.append("..")
+sys.path.append(".")
 
 from common.nets import MLP
 from common.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDynamicsModel
@@ -46,7 +46,7 @@ def get_args():
     parser.add_argument("--rollout-freq", type=int, default=1000)
     parser.add_argument("--rollout-batch-size", type=int, default=50000)
     parser.add_argument("--rollout-length", type=int, default=5)
-    parser.add_argument("--penalty-coef", type=float, default=0.0)
+    parser.add_argument("--penalty-coef", type=float, default=1.0)
     parser.add_argument("--model-retain-epochs", type=int, default=5)
     parser.add_argument("--real-ratio", type=float, default=0.05)
     parser.add_argument("--load-dynamics-path", type=str, default=None)
@@ -79,7 +79,7 @@ def train(args=get_args()):
     env.seed(args.seed)
 
     # create policy model
-    actor_backbone = MLP(input_dim=np.prod(args.obs_shape), hidden_dims=args.hidden_dims, dropout_rate=0.1)
+    actor_backbone = MLP(input_dim=np.prod(args.obs_shape), hidden_dims=args.hidden_dims)
     critic1_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
     critic2_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
     dist = TanhDiagGaussian(
