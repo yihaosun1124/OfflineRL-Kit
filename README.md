@@ -33,6 +33,9 @@ python tune_example/tune_mopo.py
 python common/plotter.py --algos "mopo"
 ```
 
+## Tutorials
+More tutorial documentations are available soon.
+
 ## Log
 Our logger supports a variant of record file types, including .txt(backup for stdout), .csv(records loss or performance or other metrics in training progress), .tfevents (tensorboard for visualizing the training curve), .json(backup for hyper-parameters).
 Our logger also has a clear log structure:
@@ -85,7 +88,7 @@ logger.set_timestep(num_timesteps)
 logger.dumpkvs()
 ```
 
-
-
+## Benchmark Results
+Benchmark results are available soon.
 
 
