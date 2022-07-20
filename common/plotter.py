@@ -9,46 +9,13 @@ import argparse
 
 
 COLORS = (
-    [
-        # deepmind style
-        '#0072B2',
-        '#009E73',
-        '#D55E00',
-        '#CC79A7',
-        # '#F0E442',
-        '#d73027',  # RED
-        # built-in color
-        'blue',
-        'red',
-        'pink',
-        'cyan',
-        'magenta',
-        'yellow',
-        'black',
-        'purple',
-        'brown',
-        'orange',
-        'teal',
-        'lightblue',
-        'lime',
-        'lavender',
-        'turquoise',
-        'darkgreen',
-        'tan',
-        'salmon',
-        'gold',
-        'darkred',
-        'darkblue',
-        'green',
-        # personal color
-        '#313695',  # DARK BLUE
-        '#74add1',  # LIGHT BLUE
-        '#f46d43',  # ORANGE
-        '#4daf4a',  # GREEN
-        '#984ea3',  # PURPLE
-        '#f781bf',  # PINK
-        '#ffc832',  # YELLOW
-        '#000000',  # BLACK
+    [   
+        '#318DE9', # blue
+        '#FF7D00', # orange
+        '#E52B50', # red
+        '#7B68EE', # purple
+        '#00CD66', # green
+        '#FFD700', # yellow
     ]
 )
 
@@ -127,23 +94,23 @@ def plot_figure(
     ax.legend()
     
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='plotter')
-    parser.add_argument('--root-dir', default='log')
-    parser.add_argument('--task', default='hopper-medium-replay-v2')
-    parser.add_argument('--algos', default=["mcq", "mopo"])
-    parser.add_argument('--query-file', default="policy_training_progress.csv")
-    parser.add_argument('--query-x', default="timestep")
-    parser.add_argument('--query-y', default="eval/normalized_episode_reward")
-    parser.add_argument('--title', default=None)
-    parser.add_argument('--xlabel', default='timestep')
-    parser.add_argument('--ylabel', default='normalized_episode_reward')
-    parser.add_argument('--smooth', type=int, default=10)
-    parser.add_argument('--colors', default=None)
-    parser.add_argument('--show', action='store_true')
-    parser.add_argument('--output-path', type=str, default="./figure.png")
-    parser.add_argument('--figsize', type=float, nargs=2, default=(5, 5))
-    parser.add_argument('--dpi', type=int, default=200)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="plotter")
+    parser.add_argument("--root-dir", default="log")
+    parser.add_argument("--task", default="hopper-medium-replay-v2")
+    parser.add_argument("--algos", type=str, nargs='*', default=["mopo"])
+    parser.add_argument("--query-file", default="policy_training_progress.csv")
+    parser.add_argument("--query-x", default="timestep")
+    parser.add_argument("--query-y", default="eval/normalized_episode_reward")
+    parser.add_argument("--title", default=None)
+    parser.add_argument("--xlabel", default="timestep")
+    parser.add_argument("--ylabel", default="normalized_episode_reward")
+    parser.add_argument("--smooth", type=int, default=10)
+    parser.add_argument("--colors", type=str, nargs='*', default=None)
+    parser.add_argument("--show", action='store_true')
+    parser.add_argument("--output-path", default="./figure.png")
+    parser.add_argument("--figsize", type=float, nargs=2, default=(5, 5))
+    parser.add_argument("--dpi", type=int, default=200)
     args = parser.parse_args()
 
     results = {}
