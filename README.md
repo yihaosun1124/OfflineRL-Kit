@@ -37,7 +37,7 @@ python tune_example/tune_mopo.py
 ```
 ### plot
 ```shell
-python common/plotter.py --algos "mopo"
+python common/plotter.py --algos "mopo" --task "hopper-medium-replay-v2"
 ```
 
 ## Tutorials
