@@ -71,8 +71,8 @@ def plot_figure(
     results,
     x_label,
     y_label,
-    title,
-    smooth_radius,
+    title=None,
+    smooth_radius=10,
     figsize=None,
     dpi=None,
     color_list=None
