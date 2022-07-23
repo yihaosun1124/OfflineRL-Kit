@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from typing import Dict, List, Union, Tuple, Optional
-from common.nets import EnsembleLinear
+from offlinerlkit.nets import EnsembleLinear
 
 
 class Swish(nn.Module):

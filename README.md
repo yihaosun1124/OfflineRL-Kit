@@ -23,7 +23,7 @@ OfflineRL-Kit is an offline reinforcement learning library based on pure PyTorch
 ```shell
 git clone https://github.com/yihaosun1124/OfflineRL-Kit.git
 cd OfflineRL-Kit
-pip install -r requirements.txt
+python setup.py install
 ```
 
 ## Examples

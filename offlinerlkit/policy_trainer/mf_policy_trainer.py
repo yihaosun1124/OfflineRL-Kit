@@ -8,9 +8,9 @@ import gym
 from typing import Optional, Dict, List
 from tqdm import tqdm
 from collections import deque
-from common.buffer import ReplayBuffer
-from common.logger import Logger
-from policy import BasePolicy
+from offlinerlkit.buffer import ReplayBuffer
+from offlinerlkit.utils.logger import Logger
+from offlinerlkit.policy import BasePolicy
 
 
 # model-free policy trainer

@@ -5,7 +5,7 @@ import gym
 
 from copy import deepcopy
 from typing import Dict, Union, Tuple
-from policy import BasePolicy
+from offlinerlkit.policy import BasePolicy
 
 
 class IQLPolicy(BasePolicy):

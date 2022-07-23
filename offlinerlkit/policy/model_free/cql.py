@@ -5,7 +5,7 @@ import gym
 
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple
-from policy import SACPolicy
+from offlinerlkit.policy import SACPolicy
 
 
 class CQLPolicy(SACPolicy):

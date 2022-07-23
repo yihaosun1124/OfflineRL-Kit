@@ -2,3 +2,6 @@
 .idea/
 **/.DS_STORE
 **/log
+**/build
+**/dist
+**/*.egg-info

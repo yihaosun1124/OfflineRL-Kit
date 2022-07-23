@@ -9,15 +9,14 @@ import d4rl
 import numpy as np
 import torch
 
-sys.path.append(".")
 
-from common.nets.mlp import MLP
-from common.modules import ActorProb, Critic, TanhDiagGaussian
-from common.utils.load_dataset import qlearning_dataset
-from common.buffer import ReplayBuffer
-from common.logger import Logger, make_log_dirs
-from common.policy_trainer import MFPolicyTrainer
-from policy import CQLPolicy
+from offlinerlkit.nets import MLP
+from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian
+from offlinerlkit.utils.load_dataset import qlearning_dataset
+from offlinerlkit.buffer import ReplayBuffer
+from offlinerlkit.utils.logger import Logger, make_log_dirs
+from offlinerlkit.policy_trainer import MFPolicyTrainer
+from offlinerlkit.policy import CQLPolicy
 
 
 def get_args():
@@ -25,7 +24,7 @@ def get_args():
     parser.add_argument("--algo-name", type=str, default="cql")
     parser.add_argument("--task", type=str, default="hopper-medium-expert-v2")
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256])
+    parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256, 256])
     parser.add_argument("--actor-lr", type=float, default=1e-4)
     parser.add_argument("--critic-lr", type=float, default=3e-4)
     parser.add_argument("--gamma", type=float, default=0.99)

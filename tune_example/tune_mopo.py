@@ -10,18 +10,17 @@ import torch
 import ray
 from ray import tune
 
-sys.path.append(".")
 
-from common.nets import MLP
-from common.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDynamicsModel
-from common.dynamics import EnsembleDynamics
-from common.utils.scaler import StandardScaler
-from common.utils.termination_fns import get_termination_fn
-from common.utils.load_dataset import qlearning_dataset
-from common.buffer import ReplayBuffer
-from common.logger import Logger, make_log_dirs
-from common.policy_trainer import MBPolicyTrainer
-from policy import MOPOPolicy
+from offlinerlkit.nets import MLP
+from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDynamicsModel
+from offlinerlkit.dynamics import EnsembleDynamics
+from offlinerlkit.utils.scaler import StandardScaler
+from offlinerlkit.utils.termination_fns import get_termination_fn
+from offlinerlkit.utils.load_dataset import qlearning_dataset
+from offlinerlkit.buffer import ReplayBuffer
+from offlinerlkit.utils.logger import Logger, make_log_dirs
+from offlinerlkit.policy_trainer import MBPolicyTrainer
+from offlinerlkit.policy import MOPOPolicy
 
 
 def get_args():

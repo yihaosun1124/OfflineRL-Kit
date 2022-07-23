@@ -6,8 +6,8 @@ import gym
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple
 from collections import defaultdict
-from policy import SACPolicy
-from common.dynamics import BaseDynamics
+from offlinerlkit.policy import SACPolicy
+from offlinerlkit.dynamics import BaseDynamics
 
 
 class MOPOPolicy(SACPolicy):

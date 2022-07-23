@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 
 from typing import Callable, List, Tuple, Dict
-from common.dynamics import BaseDynamics
-from common.utils.scaler import StandardScaler
-from common.logger import Logger
+from offlinerlkit.dynamics import BaseDynamics
+from offlinerlkit.utils.scaler import StandardScaler
+from offlinerlkit.utils.logger import Logger
 
 
 class EnsembleDynamics(BaseDynamics):

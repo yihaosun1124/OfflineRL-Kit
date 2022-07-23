@@ -9,15 +9,14 @@ import d4rl
 import numpy as np
 import torch
 
-sys.path.append(".")
 
-from common.nets.mlp import MLP
-from common.modules import ActorProb, Critic, DiagGaussian
-from common.utils.load_dataset import qlearning_dataset
-from common.buffer import ReplayBuffer
-from common.logger import Logger, make_log_dirs
-from common.policy_trainer import MFPolicyTrainer
-from policy import IQLPolicy
+from offlinerlkit.nets import MLP
+from offlinerlkit.modules import ActorProb, Critic, DiagGaussian
+from offlinerlkit.utils.load_dataset import qlearning_dataset
+from offlinerlkit.buffer import ReplayBuffer
+from offlinerlkit.utils.logger import Logger, make_log_dirs
+from offlinerlkit.policy_trainer import MFPolicyTrainer
+from offlinerlkit.policy import IQLPolicy
 
 
 def get_args():

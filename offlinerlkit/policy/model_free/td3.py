@@ -2,15 +2,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from torch.nn import functional as F
-from typing import Dict, Union, Tuple, Callable
-from policy import TD3Policy
-from common.utils.noise import GaussianNoise
+from copy import deepcopy
+from typing import Callable, Dict, Union, Tuple
+from offlinerlkit.policy import BasePolicy
+from offlinerlkit.utils.noise import GaussianNoise
 
 
-class TD3BCPolicy(TD3Policy):
+class TD3Policy(BasePolicy):
     """
-    TD3+BC <Ref: https://arxiv.org/abs/2106.06860>
+    Twin Delayed Deep Deterministic policy gradient <Ref: https://arxiv.org/abs/1802.09477>
     """
 
     def __init__(
@@ -28,26 +28,35 @@ class TD3BCPolicy(TD3Policy):
         policy_noise: float = 0.2,
         noise_clip: float = 0.5,
         update_actor_freq: int = 2,
-        alpha: float = 2.5
     ) -> None:
+        super().__init__()
 
-        super().__init__(
-            actor,
-            critic1,
-            critic2,
-            actor_optim,
-            critic1_optim,
-            critic2_optim,
-            tau=tau,
-            gamma=gamma,
-            max_action=max_action,
-            exploration_noise=exploration_noise,
-            policy_noise=policy_noise,
-            noise_clip=noise_clip,
-            update_actor_freq=update_actor_freq
-        )
+        self.actor = actor
+        self.actor_old = deepcopy(actor)
+        self.actor_old.eval()
+        self.actor_optim = actor_optim
 
-        self._alpha = alpha
+        self.critic1 = critic1
+        self.critic1_old = deepcopy(critic1)
+        self.critic1_old.eval()
+        self.critic1_optim = critic1_optim
+
+        self.critic2 = critic2
+        self.critic2_old = deepcopy(critic2)
+        self.critic2_old.eval()
+        self.critic2_optim = critic2_optim
+
+        self._tau = tau
+        self._gamma = gamma
+
+        self._max_action = max_action
+        self.exploration_noise = exploration_noise
+        self._policy_noise = policy_noise
+        self._noise_clip = noise_clip
+        self._freq = update_actor_freq
+
+        self._cnt = 0
+        self._last_actor_loss = 0
     
     def train(self) -> None:
         self.actor.train()
@@ -102,8 +111,7 @@ class TD3BCPolicy(TD3Policy):
         if self._cnt % self._freq == 0:
             a = self.actor(obss)
             q = self.critic1(obss, a)
-            lmbda = self._alpha / q.abs().mean().detach()
-            actor_loss = -lmbda * q.mean() + ((a - actions).pow(2)).mean()
+            actor_loss = -q.mean()
             self.actor_optim.zero_grad()
             actor_loss.backward()
             self.actor_optim.step()
