@@ -178,7 +178,7 @@ class EnsembleDynamics(BaseDynamics):
     def select_elites(self, metrics: List) -> List[int]:
         pairs = [(metric, index) for metric, index in zip(metrics, range(len(metrics)))]
         pairs = sorted(pairs, key=lambda x: x[0])
-        elites = [pairs[i][1] for i in range(self.model.num_ensemble)]
+        elites = [pairs[i][1] for i in range(self.model.num_elites)]
         return elites
     
     def update_save(self, indexes: List[int]) -> None:
