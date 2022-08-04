@@ -7,13 +7,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 
+import sys
+sys.path.append('.')
+
 
 COLORS = (
     [   
         '#318DE9', # blue
         '#FF7D00', # orange
         '#E52B50', # red
-        '#7F74AE', # purple
+        '#8D6AB8', # purple
         '#00CD66', # green
         '#FFD700', # yellow
     ]
