@@ -47,7 +47,7 @@ class MBPolicyTrainer:
         self._eval_episodes = eval_episodes
         self._normalize_obs = normalize_obs
         if normalize_obs:
-            self._obs_mean, self._obs_std = self.buffer.normalize_obs()
+            self._obs_mean, self._obs_std = self.real_buffer.normalize_obs()
         self.lr_scheduler = lr_scheduler
 
     def train(self) -> Dict[str, float]:
