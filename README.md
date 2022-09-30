@@ -35,6 +35,15 @@ First, make an environment and get the offline dataset:
 ```python
 env = gym.make(args.task)
 dataset = qlearning_dataset(env)
+buffer = ReplayBuffer(
+    buffer_size=len(dataset["observations"]),
+    obs_shape=args.obs_shape,
+    obs_dtype=np.float32,
+    action_dim=args.action_dim,
+    action_dtype=np.float32,
+    device=args.device
+)
+buffer.load_dataset(dataset)
 ```
 
 Define the models and optimizers:
