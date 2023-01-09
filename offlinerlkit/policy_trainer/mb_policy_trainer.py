@@ -13,7 +13,7 @@ from offlinerlkit.utils.logger import Logger
 from offlinerlkit.policy import BasePolicy
 
 
-# model-based policy trainer
+# model-based iql policy trainer
 class MBPolicyTrainer:
     def __init__(
         self,
@@ -29,7 +29,8 @@ class MBPolicyTrainer:
         real_ratio: float = 0.05,
         eval_episodes: int = 10,
         normalize_obs: bool = False,
-        lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None
+        lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+        oracle_dynamics=None
     ) -> None:
         self.policy = policy
         self.eval_env = eval_env
@@ -47,8 +48,10 @@ class MBPolicyTrainer:
         self._eval_episodes = eval_episodes
         self._normalize_obs = normalize_obs
         if normalize_obs:
-            self._obs_mean, self._obs_std = self.buffer.normalize_obs()
+            self._obs_mean, self._obs_std = self.real_buffer.normalize_obs()
         self.lr_scheduler = lr_scheduler
+
+        self.oracle_dynamics = oracle_dynamics
 
     def train(self) -> Dict[str, float]:
         start_time = time.time()
@@ -75,7 +78,7 @@ class MBPolicyTrainer:
                 fake_sample_size = self._batch_size - real_sample_size
                 real_batch = self.real_buffer.sample(batch_size=real_sample_size)
                 fake_batch = self.fake_buffer.sample(batch_size=fake_sample_size)
-                batch = {key: torch.cat([real_batch[key], fake_batch[key]], axis=0) for key in real_batch.keys()}
+                batch = {"real": real_batch, "fake": fake_batch}
                 loss = self.policy.learn(batch)
                 pbar.set_postfix(**loss)
 
@@ -94,6 +97,7 @@ class MBPolicyTrainer:
             norm_ep_rew_mean = self.eval_env.get_normalized_score(ep_reward_mean) * 100
             norm_ep_rew_std = self.eval_env.get_normalized_score(ep_reward_std) * 100
             last_10_performance.append(norm_ep_rew_mean)
+
             self.logger.logkv("eval/normalized_episode_reward", norm_ep_rew_mean)
             self.logger.logkv("eval/normalized_episode_reward_std", norm_ep_rew_std)
             self.logger.logkv("eval/episode_length", ep_length_mean)

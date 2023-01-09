@@ -10,9 +10,9 @@ from offlinerlkit.policy import SACPolicy
 from offlinerlkit.dynamics import BaseDynamics
 
 
-class MOPOPolicy(SACPolicy):
+class MOPEPolicy(SACPolicy):
     """
-    Model-based Offline Policy Optimization <Ref: https://arxiv.org/abs/2005.13239>
+    Model-based Offline with Policy Embedding
     """
 
     def __init__(
@@ -48,19 +48,24 @@ class MOPOPolicy(SACPolicy):
         rollout_length: int
     ) -> Tuple[Dict[str, np.ndarray], Dict]:
 
+        self.dynamics.model.eval()
+        
         num_transitions = 0
         rewards_arr = np.array([])
         rollout_transitions = defaultdict(list)
+        batch_size, obs_dim = init_obss.shape
 
         # rollout
         observations = init_obss
+        obs_history = init_obss.reshape(len(init_obss), 1, -1)
         for _ in range(rollout_length):
-            actions = self.select_action(observations)
-            next_observations, rewards, terminals, info = self.dynamics.step(observations, actions)
+            actions = self.select_action(obs_history.reshape(-1, obs_dim))
+            act_history = actions.reshape(len(obs_history), -1, actions.shape[-1])
+            next_observations, rewards, terminals, info = self.dynamics.step(obs_history, act_history)
 
             rollout_transitions["obss"].append(observations)
             rollout_transitions["next_obss"].append(next_observations)
-            rollout_transitions["actions"].append(actions)
+            rollout_transitions["actions"].append(act_history[:, -1])
             rollout_transitions["rewards"].append(rewards)
             rollout_transitions["terminals"].append(terminals)
 
@@ -70,16 +75,13 @@ class MOPOPolicy(SACPolicy):
             nonterm_mask = (~terminals).flatten()
             if nonterm_mask.sum() == 0:
                 break
-
-            observations = next_observations[nonterm_mask]
+            
+            obs_history = np.concatenate([obs_history, next_observations.reshape(len(next_observations), 1, -1)], axis=1)
+            obs_history = obs_history[nonterm_mask].copy()
+            observations = next_observations[nonterm_mask].copy()
         
         for k, v in rollout_transitions.items():
             rollout_transitions[k] = np.concatenate(v, axis=0)
 
         return rollout_transitions, \
             {"num_transitions": num_transitions, "reward_mean": rewards_arr.mean()}
-
-    def learn(self, batch: Dict) -> Dict[str, float]:
-        real_batch, fake_batch = batch["real"], batch["fake"]
-        mix_batch = {k: torch.cat([real_batch[k], fake_batch[k]], 0) for k in real_batch.keys()}
-        return super().learn(mix_batch)

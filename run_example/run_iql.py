@@ -152,5 +152,4 @@ def train(args=get_args()):
 
 
 if __name__ == "__main__":
-    os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
     train()

@@ -73,9 +73,9 @@ class IQLPolicy(BasePolicy):
         with torch.no_grad():
             dist = self.actor(obs)
             if deterministic:
-                action = dist.mode().cpu().numpy().flatten()
+                action = dist.mode().cpu().numpy()
             else:
-                action = dist.sample().cpu().numpy().flatten()
+                action = dist.sample().cpu().numpy()
         action = np.clip(action, self.action_space.low[0], self.action_space.high[0])
         return action
     

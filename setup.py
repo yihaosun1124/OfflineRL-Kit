@@ -12,7 +12,7 @@ setup(
         packages=find_packages(),
         platforms=["all"],
         install_requires=[
-            "d4rl",
+            # "d4rl",
             "gym",
             "matplotlib",
             "numpy",

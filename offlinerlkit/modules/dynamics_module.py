@@ -39,7 +39,6 @@ class EnsembleDynamicsModel(nn.Module):
         activation: nn.Module = Swish,
         weight_decays: Optional[Union[List[float], Tuple[float]]] = None,
         with_reward: bool = True,
-        load_model: bool = False,
         device: str = "cpu"
     ) -> None:
         super().__init__()
@@ -47,7 +46,6 @@ class EnsembleDynamicsModel(nn.Module):
         self.num_ensemble = num_ensemble
         self.num_elites = num_elites
         self._with_reward = with_reward
-        self.load_model = load_model
         self.device = torch.device(device)
 
         self.activation = activation()
@@ -59,16 +57,14 @@ class EnsembleDynamicsModel(nn.Module):
         if weight_decays is None:
             weight_decays = [0.0] * (len(hidden_dims) + 1)
         for in_dim, out_dim, weight_decay in zip(hidden_dims[:-1], hidden_dims[1:], weight_decays[:-1]):
-            module_list.append(EnsembleLinear(in_dim, out_dim, num_ensemble, num_elites, weight_decay, load_model))
+            module_list.append(EnsembleLinear(in_dim, out_dim, num_ensemble, weight_decay))
         self.backbones = nn.ModuleList(module_list)
 
         self.output_layer = EnsembleLinear(
             hidden_dims[-1],
             2 * (obs_dim + self._with_reward),
             num_ensemble,
-            num_elites,
-            weight_decays[-1],
-            load_model
+            weight_decays[-1]
         )
 
         self.register_parameter(
@@ -78,6 +74,11 @@ class EnsembleDynamicsModel(nn.Module):
         self.register_parameter(
             "min_logvar",
             nn.Parameter(torch.ones(obs_dim + self._with_reward) * -10, requires_grad=True)
+        )
+
+        self.register_parameter(
+            "elites",
+            nn.Parameter(torch.tensor(list(range(0, self.num_elites))), requires_grad=False)
         )
 
         self.to(self.device)
@@ -91,15 +92,10 @@ class EnsembleDynamicsModel(nn.Module):
         logvar = soft_clamp(logvar, self.min_logvar, self.max_logvar)
         return mean, logvar
 
-    def set_elites(self, indexes: List[int]) -> None:
+    def load_save(self) -> None:
         for layer in self.backbones:
-            layer.set_elites(indexes)
-        self.output_layer.set_elites(indexes)
-    
-    def reset_elites(self) -> None:
-        for layer in self.backbones:
-            layer.reset_elites()
-        self.output_layer.reset_elites()
+            layer.load_save()
+        self.output_layer.load_save()
 
     def update_save(self, indexes: List[int]) -> None:
         for layer in self.backbones:
@@ -112,3 +108,11 @@ class EnsembleDynamicsModel(nn.Module):
             decay_loss += layer.get_decay_loss()
         decay_loss += self.output_layer.get_decay_loss()
         return decay_loss
+
+    def set_elites(self, indexes: List[int]) -> None:
+        assert len(indexes) <= self.num_ensemble and max(indexes) < self.num_ensemble
+        self.register_parameter('elites', nn.Parameter(torch.tensor(indexes), requires_grad=False))
+    
+    def random_elite_idxs(self, batch_size: int) -> np.ndarray:
+        idxs = np.random.choice(self.elites.data.cpu().numpy(), size=batch_size)
+        return idxs

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from typing import Callable, List, Tuple, Dict
+from typing import Callable, List, Tuple, Dict, Optional
 from offlinerlkit.dynamics import BaseDynamics
 from offlinerlkit.utils.scaler import StandardScaler
 from offlinerlkit.utils.logger import Logger
@@ -25,6 +25,7 @@ class EnsembleDynamics(BaseDynamics):
         self._penalty_coef = penalty_coef
         self._uncertainty_mode = uncertainty_mode
 
+    @ torch.no_grad()
     def step(
         self,
         obs: np.ndarray,
@@ -33,19 +34,21 @@ class EnsembleDynamics(BaseDynamics):
         "imagine single forward step"
         obs_act = np.concatenate([obs, action], axis=-1)
         obs_act = self.scaler.transform(obs_act)
-        with torch.no_grad():
-            mean, logvar = self.model(obs_act)
+        mean, logvar = self.model(obs_act)
         mean = mean.cpu().numpy()
         logvar = logvar.cpu().numpy()
         mean[..., :-1] += obs
         std = np.sqrt(np.exp(logvar))
-        samples = (mean + np.random.normal(size=mean.shape) * std).astype(np.float32)
-        next_obss = samples[..., :-1]
-        rewards = samples[..., -1:]
 
-        select_indexes = np.random.randint(0, next_obss.shape[0], size=(obs.shape[0]))
-        next_obs = next_obss[select_indexes, np.arange(obs.shape[0])]
-        reward = rewards[select_indexes, np.arange(obs.shape[0])]
+        ensemble_samples = (mean + np.random.normal(size=mean.shape) * std).astype(np.float32)
+
+        # choose one model from ensemble
+        num_models, batch_size, _ = ensemble_samples.shape
+        model_idxs = self.model.random_elite_idxs(batch_size)
+        samples = ensemble_samples[model_idxs, np.arange(batch_size)]
+        
+        next_obs = samples[..., :-1]
+        reward = samples[..., -1:]
         terminal = self.terminal_fn(obs, action, next_obs)
         info = {}
         info["raw_reward"] = reward
@@ -54,10 +57,13 @@ class EnsembleDynamics(BaseDynamics):
             if self._uncertainty_mode == "aleatoric":
                 penalty = np.amax(np.linalg.norm(std, axis=2), axis=0)
             elif self._uncertainty_mode == "pairwise-diff":
-                next_obses_mean = mean[:, :, :-1]
+                next_obses_mean = mean[..., :-1]
                 next_obs_mean = np.mean(next_obses_mean, axis=0)
                 diff = next_obses_mean - next_obs_mean
                 penalty = np.amax(np.linalg.norm(diff, axis=2), axis=0)
+            elif self._uncertainty_mode == "ensemble_std":
+                next_obses_mean = mean[..., :-1]
+                penalty = np.sqrt(next_obses_mean.var(0).mean(1))
             else:
                 raise ValueError
             penalty = np.expand_dims(penalty, 1).astype(np.float32)
@@ -66,6 +72,50 @@ class EnsembleDynamics(BaseDynamics):
             info["penalty"] = penalty
         
         return next_obs, reward, terminal, info
+    
+    @ torch.no_grad()
+    def compute_model_uncertainty(self, obs: np.ndarray, action: np.ndarray, uncertainty_mode="aleatoric") -> np.ndarray:
+        obs_act = np.concatenate([obs, action], axis=-1)
+        obs_act = self.scaler.transform(obs_act)
+        mean, logvar = self.model(obs_act)
+        mean = mean.cpu().numpy()
+        logvar = logvar.cpu().numpy()
+        mean[..., :-1] += obs
+        std = np.sqrt(np.exp(logvar))
+
+        if uncertainty_mode == "aleatoric":
+            penalty = np.amax(np.linalg.norm(std, axis=2), axis=0)
+        elif uncertainty_mode == "pairwise-diff":
+            next_obses_mean = mean[:, :, :-1]
+            next_obs_mean = np.mean(next_obses_mean, axis=0)
+            diff = next_obses_mean - next_obs_mean
+            penalty = np.amax(np.linalg.norm(diff, axis=2), axis=0)
+        else:
+            raise ValueError
+        
+        penalty = np.expand_dims(penalty, 1).astype(np.float32)
+
+        return self._penalty_coef * penalty
+    
+    @ torch.no_grad()
+    def predict_next_obs(
+        self,
+        obs: torch.Tensor,
+        action: torch.Tensor,
+        num_samples: int
+    ) -> torch.Tensor:
+        obs_act = torch.cat([obs, action], dim=-1)
+        obs_act = self.scaler.transform_tensor(obs_act, device=obs_act.device)
+        mean, logvar = self.model(obs_act)
+        mean[..., :-1] += obs
+        std = torch.sqrt(torch.exp(logvar))
+
+        mean = mean[self.model.elites.data.cpu().numpy()]
+        std = std[self.model.elites.data.cpu().numpy()]
+
+        samples = torch.stack([mean + torch.randn_like(std) * std for i in range(num_samples)], 0)
+        next_obss = samples[..., :-1]
+        return next_obss
 
     def format_samples_for_training(self, data: Dict) -> Tuple[np.ndarray, np.ndarray]:
         obss = data["observations"]
@@ -77,7 +127,13 @@ class EnsembleDynamics(BaseDynamics):
         targets = np.concatenate((delta_obss, rewards), axis=-1)
         return inputs, targets
 
-    def train(self, data: Dict, logger: Logger) -> None:
+    def train(
+        self,
+        data: Dict,
+        logger: Logger,
+        max_epochs: Optional[float] = None,
+        max_epochs_since_update: int = 10
+    ) -> None:
         inputs, targets = self.format_samples_for_training(data)
         data_size = inputs.shape[0]
         holdout_size = min(int(data_size * 0.2), 1000)
@@ -86,9 +142,9 @@ class EnsembleDynamics(BaseDynamics):
         train_inputs, train_targets = inputs[train_splits.indices], targets[train_splits.indices]
         holdout_inputs, holdout_targets = inputs[holdout_splits.indices], targets[holdout_splits.indices]
 
-        self.fit(train_inputs)
-        train_inputs = self.transform(train_inputs)
-        holdout_inputs = self.transform(holdout_inputs)
+        self.scaler.fit(train_inputs)
+        train_inputs = self.scaler.transform(train_inputs)
+        holdout_inputs = self.scaler.transform(holdout_inputs)
         holdout_losses = [1e10 for i in range(self.model.num_ensemble)]
 
         data_idxes = np.random.randint(train_size, size=[self.model.num_ensemble, train_size])
@@ -101,7 +157,6 @@ class EnsembleDynamics(BaseDynamics):
         logger.log("Training dynamics:")
         while True:
             epoch += 1
-            self.model.train()
             train_loss = self.learn(train_inputs[data_idxes], train_targets[data_idxes])
             new_holdout_losses = self.validate(holdout_inputs, holdout_targets)
             holdout_loss = (np.sort(new_holdout_losses)[:self.model.num_elites]).mean()
@@ -121,21 +176,23 @@ class EnsembleDynamics(BaseDynamics):
                     holdout_losses[i] = new_loss
             
             if len(indexes) > 0:
-                self.update_save(indexes)
+                self.model.update_save(indexes)
                 cnt = 0
             else:
                 cnt += 1
             
-            if cnt >= 5:
+            if (cnt >= max_epochs_since_update) or (max_epochs and (epoch >= max_epochs)):
                 break
 
         indexes = self.select_elites(holdout_losses)
-        self.set_elites(indexes)
+        self.model.set_elites(indexes)
+        self.model.load_save()
         self.save(logger.model_dir)
         self.model.eval()
         logger.log("elites:{} , holdout loss: {}".format(indexes, (np.sort(holdout_losses)[:self.model.num_elites]).mean()))
     
     def learn(self, inputs: np.ndarray, targets: np.ndarray, batch_size: int = 256) -> float:
+        self.model.train()
         train_size = inputs.shape[1]
         losses = []
 
@@ -160,32 +217,20 @@ class EnsembleDynamics(BaseDynamics):
             losses.append(loss.item())
         return np.mean(losses)
     
+    @ torch.no_grad()
     def validate(self, inputs: np.ndarray, targets: np.ndarray) -> List[float]:
         self.model.eval()
         targets = torch.as_tensor(targets).to(self.model.device)
-        with torch.no_grad():
-            mean, _ = self.model(inputs)
-            loss = ((mean - targets) ** 2).mean(dim=(1, 2))
+        mean, _ = self.model(inputs)
+        loss = ((mean - targets) ** 2).mean(dim=(1, 2))
         val_loss = list(loss.cpu().numpy())
         return val_loss
-    
-    def fit(self, x: np.ndarray) -> None:
-        self.scaler.fit(x)
-
-    def transform(self, x: np.ndarray) -> None:
-        return self.scaler.transform(x)
     
     def select_elites(self, metrics: List) -> List[int]:
         pairs = [(metric, index) for metric, index in zip(metrics, range(len(metrics)))]
         pairs = sorted(pairs, key=lambda x: x[0])
         elites = [pairs[i][1] for i in range(self.model.num_elites)]
         return elites
-    
-    def update_save(self, indexes: List[int]) -> None:
-        self.model.update_save(indexes)
-    
-    def set_elites(self, indexes: List[int]) -> None:
-        self.model.set_elites(indexes)
 
     def save(self, save_path: str) -> None:
         torch.save(self.model.state_dict(), os.path.join(save_path, "dynamics.pth"))

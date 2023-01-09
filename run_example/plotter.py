@@ -91,29 +91,29 @@ def plot_figure(
         shaded = smooth(shaded, smooth_radius)
         ax.plot(x, y, color=color_list[i], label=algo_name)
         ax.fill_between(x, y-shaded, y+shaded, color=color_list[i], alpha=0.2)
-    ax.set_title(title)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    ax.legend()
+    ax.set_title(title, fontdict={'size': 10})
+    ax.set_xlabel(x_label, fontdict={'size': 10})
+    ax.set_ylabel(y_label, fontdict={'size': 10})
+    ax.legend(loc=4, prop={'size': 10})
     
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="plotter")
     parser.add_argument("--root-dir", default="log")
-    parser.add_argument("--task", default="hopper-medium-replay-v2")
-    parser.add_argument("--algos", type=str, nargs='*', default=["mopo"])
+    parser.add_argument("--task", default="hopper-medium-expert-v2")
+    parser.add_argument("--algos", type=str, nargs='*', default=["mobile&penalty_coef=1.5&rollout_length=5&real_ratio=0.05&auto_alpha=True"])
     parser.add_argument("--query-file", default="policy_training_progress.csv")
     parser.add_argument("--query-x", default="timestep")
     parser.add_argument("--query-y", default="eval/normalized_episode_reward")
     parser.add_argument("--title", default=None)
-    parser.add_argument("--xlabel", default="timestep")
-    parser.add_argument("--ylabel", default="normalized_episode_reward")
+    parser.add_argument("--xlabel", default="Timesteps")
+    parser.add_argument("--ylabel", default=None)
     parser.add_argument("--smooth", type=int, default=10)
     parser.add_argument("--colors", type=str, nargs='*', default=None)
     parser.add_argument("--show", action='store_true')
-    parser.add_argument("--output-path", default="./figure.png")
-    parser.add_argument("--figsize", type=float, nargs=2, default=(5, 5))
-    parser.add_argument("--dpi", type=int, default=200)
+    parser.add_argument("--output-path", default="./hopper-medium-expert.png")
+    parser.add_argument("--figsize", type=float, nargs=2, default=(8, 6))
+    parser.add_argument("--dpi", type=int, default=500)
     args = parser.parse_args()
 
     results = {}
@@ -134,6 +134,6 @@ if __name__ == "__main__":
         color_list=args.colors
     )
     if args.output_path:
-        plt.savefig(args.output_path, bbox_inches='tight')
+        plt.savefig(args.output_path)
     if args.show:
         plt.show()

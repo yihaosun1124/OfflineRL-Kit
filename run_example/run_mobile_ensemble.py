@@ -19,15 +19,15 @@ from offlinerlkit.utils.load_dataset import qlearning_dataset
 from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MBPolicyTrainer
-from offlinerlkit.policy import MOPOPolicy
+from offlinerlkit.policy import MOBILEEnsemblePolicy
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--algo-name", type=str, default="mopo")
-    parser.add_argument("--task", type=str, default="hopper-medium-expert-v2")
+    parser.add_argument("--algo-name", type=str, default="mobile-ensemble")
+    parser.add_argument("--task", type=str, default="pen-cloned-v1")
     parser.add_argument("--seed", type=int, default=2)
-    parser.add_argument("--actor-lr", type=float, default=1e-4)
+    parser.add_argument("--actor-lr", type=float, default=3e-5)
     parser.add_argument("--critic-lr", type=float, default=3e-4)
     parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256, 256])
     parser.add_argument("--gamma", type=float, default=0.99)
@@ -35,7 +35,9 @@ def get_args():
     parser.add_argument("--alpha", type=float, default=0.2)
     parser.add_argument("--auto-alpha", default=True)
     parser.add_argument("--target-entropy", type=int, default=None)
-    parser.add_argument("--alpha-lr", type=float, default=1e-4)
+    parser.add_argument("--alpha-lr", type=float, default=3e-5)
+
+    parser.add_argument("--num-q-ensemble", type=int, default=10)
 
     parser.add_argument("--dynamics-lr", type=float, default=1e-3)
     parser.add_argument("--dynamics-hidden-dims", type=int, nargs='*', default=[200, 200, 200, 200])
@@ -44,13 +46,14 @@ def get_args():
     parser.add_argument("--n-elites", type=int, default=5)
     parser.add_argument("--rollout-freq", type=int, default=1000)
     parser.add_argument("--rollout-batch-size", type=int, default=50000)
-    parser.add_argument("--rollout-length", type=int, default=5)
-    parser.add_argument("--penalty-coef", type=float, default=5.0)
+    parser.add_argument("--rollout-length", type=int, default=10)
+    parser.add_argument("--penalty-coef", type=float, default=0)
+    parser.add_argument("--num-samples", type=int, default=10)
     parser.add_argument("--model-retain-epochs", type=int, default=5)
     parser.add_argument("--real-ratio", type=float, default=0.05)
     parser.add_argument("--load-dynamics-path", type=str, default=None)
 
-    parser.add_argument("--epoch", type=int, default=3000)
+    parser.add_argument("--epoch", type=int, default=1000)
     parser.add_argument("--step-per-epoch", type=int, default=1000)
     parser.add_argument("--eval_episodes", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -63,8 +66,6 @@ def train(args=get_args()):
     # create env and dataset
     env = gym.make(args.task)
     dataset = qlearning_dataset(env)
-    if 'antmaze' in args.task:
-        dataset["rewards"] -= 1.0
     args.obs_shape = env.observation_space.shape
     args.action_dim = np.prod(env.action_space.shape)
     args.max_action = env.action_space.high[0]
@@ -79,8 +80,6 @@ def train(args=get_args()):
 
     # create policy model
     actor_backbone = MLP(input_dim=np.prod(args.obs_shape), hidden_dims=args.hidden_dims)
-    critic1_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
-    critic2_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
     dist = TanhDiagGaussian(
         latent_dim=getattr(actor_backbone, "output_dim"),
         output_dim=args.action_dim,
@@ -88,11 +87,13 @@ def train(args=get_args()):
         conditioned_sigma=True
     )
     actor = ActorProb(actor_backbone, dist, args.device)
-    critic1 = Critic(critic1_backbone, args.device)
-    critic2 = Critic(critic2_backbone, args.device)
     actor_optim = torch.optim.Adam(actor.parameters(), lr=args.actor_lr)
-    critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.critic_lr)
-    critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.critic_lr)
+    critics = []
+    for i in range(args.num_q_ensemble):
+        critic_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
+        critics.append(Critic(critic_backbone, args.device))
+    critics = torch.nn.ModuleList(critics)
+    critics_optim = torch.optim.Adam(critics.parameters(), lr=args.critic_lr)
 
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(actor_optim, args.epoch)
 
@@ -129,8 +130,7 @@ def train(args=get_args()):
         dynamics_model,
         dynamics_optim,
         scaler,
-        termination_fn,
-        penalty_coef=args.penalty_coef,
+        termination_fn
     )
 
     if args.load_dynamics_path:
@@ -139,17 +139,18 @@ def train(args=get_args()):
     oracle_dynamics = MujocoOracleDynamics(env)
 
     # create policy
-    policy = MOPOPolicy(
+    policy = MOBILEEnsemblePolicy(
         dynamics,
         actor,
-        critic1,
-        critic2,
+        critics,
         actor_optim,
-        critic1_optim,
-        critic2_optim,
+        critics_optim,
         tau=args.tau,
         gamma=args.gamma,
-        alpha=alpha
+        alpha=alpha,
+        penalty_coef=args.penalty_coef,
+        num_samples=args.num_samples,
+        deterministic_backup=True
     )
 
     # create buffer
@@ -162,6 +163,9 @@ def train(args=get_args()):
         device=args.device
     )
     real_buffer.load_dataset(dataset)
+    if 'human' in args.task or 'cloned' in args.task:
+        real_buffer.normalize_reward()
+
     fake_buffer = ReplayBuffer(
         buffer_size=args.rollout_batch_size*args.rollout_length*args.model_retain_epochs,
         obs_shape=args.obs_shape,
@@ -172,7 +176,7 @@ def train(args=get_args()):
     )
 
     # log
-    log_dirs = make_log_dirs(args.task, args.algo_name, args.seed, vars(args), record_params=["penalty_coef", "rollout_length"])
+    log_dirs = make_log_dirs(args.task, args.algo_name, args.seed, vars(args), record_params=["penalty_coef", "rollout_length", "real_ratio", "auto_alpha"])
     # key: output file name, value: output handler type
     output_config = {
         "consoleout_backup": "stdout",

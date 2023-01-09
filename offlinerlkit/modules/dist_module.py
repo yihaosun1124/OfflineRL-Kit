@@ -19,7 +19,7 @@ class TanhNormalWrapper(torch.distributions.Normal):
         if raw_action is None:
             raw_action = self.arctanh(action)
         log_prob = super().log_prob(raw_action).sum(-1, keepdim=True)
-        eps = np.finfo(np.float32).eps.item()
+        eps = 1e-6
         log_prob = log_prob - torch.log((1 - action.pow(2)) + eps).sum(-1, keepdim=True)
         return log_prob
 
@@ -47,7 +47,7 @@ class DiagGaussian(nn.Module):
         unbounded=False,
         conditioned_sigma=False,
         max_mu=1.0,
-        sigma_min=-20.0,
+        sigma_min=-5.0,
         sigma_max=2.0
     ):
         super().__init__()
@@ -83,7 +83,7 @@ class TanhDiagGaussian(DiagGaussian):
         unbounded=False,
         conditioned_sigma=False,
         max_mu=1.0,
-        sigma_min=-20.0,
+        sigma_min=-5.0,
         sigma_max=2.0
     ):
         super().__init__(
