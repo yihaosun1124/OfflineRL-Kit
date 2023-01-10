@@ -30,7 +30,8 @@ class MBPolicyTrainer:
         eval_episodes: int = 10,
         normalize_obs: bool = False,
         lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
-        oracle_dynamics=None
+        oracle_dynamics=None, 
+        dynamics_update_freq: int = 0
     ) -> None:
         self.policy = policy
         self.eval_env = eval_env
@@ -40,6 +41,7 @@ class MBPolicyTrainer:
 
         self._rollout_freq, self._rollout_batch_size, \
             self._rollout_length = rollout_setting
+        self._dynamics_update_freq = dynamics_update_freq
 
         self._epoch = epoch
         self._step_per_epoch = step_per_epoch
@@ -84,6 +86,12 @@ class MBPolicyTrainer:
 
                 for k, v in loss.items():
                     self.logger.logkv_mean(k, v)
+                
+                # update the dynamics if necessary
+                if 0 < self._dynamics_update_freq and (num_timesteps+1)%self._dynamics_update_freq == 0:
+                    dynamics_update_info = self.policy.update_dynamics(self.real_buffer)
+                    for k, v in dynamics_update_info.items():
+                        self.logger.logkv_mean(k, v)
                 
                 num_timesteps += 1
 
