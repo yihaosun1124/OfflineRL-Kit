@@ -15,7 +15,7 @@ from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDy
 from offlinerlkit.dynamics import EnsembleDynamics
 from offlinerlkit.dynamics import MujocoOracleDynamics
 from offlinerlkit.utils.scaler import StandardScaler
-from offlinerlkit.utils.termination_fns import get_termination_fn
+from offlinerlkit.utils.termination_fns import get_termination_fn, obs_unnormalization
 from offlinerlkit.utils.load_dataset import qlearning_dataset
 from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
@@ -106,7 +106,8 @@ def train(args=get_args()):
     critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.critic_lr)
 
     # CHECK: do anealing?
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(actor_optim, args.epoch)
+    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(actor_optim, args.epoch)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(actor_optim, 1, -1)
     
     if args.auto_alpha:
         target_entropy = args.target_entropy if args.target_entropy \
@@ -120,8 +121,28 @@ def train(args=get_args()):
     else:
         alpha = args.alpha
 
+    # create buffer
+    real_buffer = ReplayBuffer(
+        buffer_size=len(dataset["observations"]),
+        obs_shape=args.obs_shape,
+        obs_dtype=np.float32,
+        action_dim=args.action_dim,
+        action_dtype=np.float32,
+        device=args.device
+    )
+    real_buffer.load_dataset(dataset)
+    obs_mean, obs_std = real_buffer.normalize_obs()
+    fake_buffer_size = args.step_per_epoch // args.rollout_freq * args.model_retain_epochs * args.rollout_batch_size * args.rollout_length
+    fake_buffer = ReplayBuffer(
+        buffer_size=fake_buffer_size, 
+        obs_shape=args.obs_shape,
+        obs_dtype=np.float32,
+        action_dim=args.action_dim,
+        action_dtype=np.float32,
+        device=args.device
+    )
+    
     # create dynamics
-    load_dynamics_model = True if args.load_dynamics_path else False
     dynamics_model = EnsembleDynamicsModel(
         obs_dim=np.prod(args.obs_shape),
         action_dim=args.action_dim,
@@ -139,8 +160,8 @@ def train(args=get_args()):
         dynamics_model.parameters(), 
         lr=args.dynamics_adv_lr
     )
-    scaler = StandardScaler()
-    termination_fn = get_termination_fn(task=args.task)
+    scaler = StandardScaler()   # CHECK 这里换成dummy scaler
+    termination_fn = obs_unnormalization(get_termination_fn(task=args.task), obs_mean, obs_std)
     dynamics = EnsembleDynamics(
         dynamics_model,
         dynamics_optim,
@@ -148,8 +169,6 @@ def train(args=get_args()):
         termination_fn,
     )
 
-    if args.load_dynamics_path:
-        dynamics.load(args.load_dynamics_path)
 
     oracle_dynamics = MujocoOracleDynamics(env)
 
@@ -171,26 +190,6 @@ def train(args=get_args()):
         adv_rollout_batch_size=args.adv_batch_size, 
         device=args.device
     ).to(args.device)
-
-    # create buffer
-    real_buffer = ReplayBuffer(
-        buffer_size=len(dataset["observations"]),
-        obs_shape=args.obs_shape,
-        obs_dtype=np.float32,
-        action_dim=args.action_dim,
-        action_dtype=np.float32,
-        device=args.device
-    )
-    real_buffer.load_dataset(dataset)
-    fake_buffer_size = args.step_per_epoch // args.rollout_freq * args.model_retain_epochs * args.rollout_batch_size * args.rollout_length
-    fake_buffer = ReplayBuffer(
-        buffer_size=fake_buffer_size, 
-        obs_shape=args.obs_shape,
-        obs_dtype=np.float32,
-        action_dim=args.action_dim,
-        action_dtype=np.float32,
-        device=args.device
-    )
 
     # log
     log_dirs = make_log_dirs(args.task, args.algo_name, args.seed, vars(args))
@@ -220,17 +219,20 @@ def train(args=get_args()):
         eval_episodes=args.eval_episodes, 
         lr_scheduler=lr_scheduler, 
         oracle_dynamics=oracle_dynamics, 
-        normalize_obs=True
+        obs_mean=obs_mean, 
+        obs_std=obs_std
     )
 
     # train
-    if args.do_bc:
-        if args.load_bc is not None:
-            policy.load(args.load_bc)
-            policy.to(args.device)
-        else:
-            policy.pretrain(real_buffer.sample_all(), args.bc_epoch, args.bc_batch_size, args.bc_lr, logger)
-    if not load_dynamics_model:
+    if args.load_bc_path is not None:
+        policy.load(args.load_bc)
+        policy.to(args.device)
+    else:
+        policy.pretrain(real_buffer.sample_all(), args.bc_epoch, args.bc_batch_size, args.bc_lr, logger)
+    if args.load_dynamics_path:
+        dynamics.load(args.load_dynamics_path)
+        dynamics.to(args.device)
+    else:
         dynamics.train(real_buffer.sample_all(), logger)
 
     policy_trainer.train()

@@ -31,9 +31,10 @@ class RAMBOPolicy(MOPOPolicy):
         gamma: float  = 0.99,
         alpha: Union[float, Tuple[float, torch.Tensor, torch.optim.Optimizer]] = 0.2, 
         adv_weight: float=0, 
+        adv_train_steps: int=1000, 
         adv_rollout_batch_size: int=256, 
         adv_rollout_length: int=5, 
-        include_ent_in_adv: bool=False,   # CHECK 这里是不是False
+        include_ent_in_adv: bool=False,   #  这里是不是False
         device="cpu"
     ) -> None:
         super().__init__(
@@ -51,13 +52,14 @@ class RAMBOPolicy(MOPOPolicy):
 
         self._dynmics_adv_optim = dynamics_adv_optim
         self._adv_weight = adv_weight
+        self._adv_train_steps = adv_train_steps
         self._adv_rollout_batch_size = adv_rollout_batch_size
         self._adv_rollout_length = adv_rollout_length
         self._include_ent_in_adv = include_ent_in_adv
         self.device = device
         
     def load(self, path):
-        self.load_state_dict(torch.load(path, map_location="cpu"))
+        self.load_state_dict(torch.load(os.path.join(path, "rambo.pt"), map_location="cpu"))
 
     def pretrain(self, data: Dict, n_epoch, batch_size, lr, logger) -> None:
         self._bc_optim = torch.optim.Adam(self.actor.parameters(), lr=lr)
@@ -85,8 +87,10 @@ class RAMBOPolicy(MOPOPolicy):
                 self._bc_optim.step()
                 sum_loss += bc_loss.cpu().item()
             print(f"Epoch {i_epoch}, mean bc loss {sum_loss/i_batch}")
+            # logger.logkv("loss/pretrain_bc", sum_loss/i_batch)
+            # logger.set_timestep(i_epoch)
+            # logger.dumpkvs(exclude)
         torch.save(self.state_dict(), os.path.join(logger.model_dir, "rambo_pretrain.pt"))
-
 
     def update_dynamics(
         self, 
@@ -97,9 +101,10 @@ class RAMBOPolicy(MOPOPolicy):
             "sl_loss": 0, 
             "adv_loss": 0
         }
+        self.dynamics.train()
         steps = 0
-        while steps < 1000:
-            init_obss = real_buffer.sample(self._adv_batch_size)["observations"].cpu().numpy()
+        while steps < self._adv_train_steps:
+            init_obss = real_buffer.sample(self._adv_rollout_batch_size)["observations"].cpu().numpy()
             observations = init_obss
             for t in range(self._adv_rollout_length):
                 actions = self.select_action(observations)
@@ -110,13 +115,15 @@ class RAMBOPolicy(MOPOPolicy):
                 all_loss_info["adv_loss"] += loss_info["adv_loss"]
                 all_loss_info["sl_loss"] += loss_info["sl_loss"]
 
-                nonterm_mask = (~terminals).flatten()
+                # nonterm_mask = (~terminals).flatten()
                 steps += 1
-                observations = next_observations[nonterm_mask]
-                if nonterm_mask.sum() == 0:
-                    break
+                # observations = next_observations[nonterm_mask]
+                observations = next_observations
+                # if nonterm_mask.sum() == 0:
+                    # break
                 if steps == 1000:
                     break
+        self.dynamics.eval()
         return {_key: _value/steps for _key, _value in all_loss_info.items()}
 
 
@@ -131,28 +138,25 @@ class RAMBOPolicy(MOPOPolicy):
     ):
         obs_act = np.concatenate([observations, actions], axis=-1)
         obs_act = self.dynamics.scaler.transform(obs_act)
-        with torch.no_grad():
-            mean, logvar = self.dynamics.model(obs_act)
-        # mean = mean.cpu().numpy()
-        # logvar = logvar.cpu().numpy()
+        mean, logvar = self.dynamics.model(obs_act)
         observations = torch.from_numpy(observations).to(mean.device)
         mean[..., :-1] += observations
         std = torch.sqrt(torch.exp(logvar))
-        _noise_generator = torch.distributions.Normal(torch.zeros_like(mean), torch.ones_like(mean))
-        noise = _noise_generator.sample()
-
+        
+        dist = torch.distributions.Normal(mean, std)
+        ensemble_sample = dist.sample()
+        ensemble_size, batch_size, _ = ensemble_size.shape
+        
         # select the next observations
-        sample_size = mean.shape[1]
-        selected_indexes = np.random.randint(0, noise.shape[0], size=sample_size)
-        noise = noise[selected_indexes, np.arange(sample_size)]
-        sample = mean + noise * std
-        next_observations = sample[..., :-1][selected_indexes, np.arange(sample_size)]
-        rewards = sample[..., -1][selected_indexes, np.arange(sample_size)]
+        selected_indexes = np.random.randint(0, ensemble_size, size=batch_size)    # CHECK 这里有可能应该使用所有模型
+        sample = ensemble_sample[selected_indexes, np.arange(batch_size)]
+        next_observations = sample[..., :-1]
+        rewards = sample[..., -1:]
         terminals = np.squeeze(self.dynamics.terminal_fn(observations.detach().cpu().numpy(), actions, next_observations.detach().cpu().numpy()))
-        # terminals = torch.from_numpy(terminals).to(mean.device)
-        # evaluate the noises
-        log_prob = _noise_generator.log_prob(noise)
-        log_prob = log_prob.exp().sum(dim=0).log().sum(-1)
+
+        # compute logprob
+        log_prob = dist.log_prob(sample)
+        log_prob = log_prob.exp().mean(dim=0).log().sum(-1)
 
         # compute the advantage
         with torch.no_grad():
@@ -163,26 +167,26 @@ class RAMBOPolicy(MOPOPolicy):
             )
             if self._include_ent_in_adv:
                 next_q = next_q - self._alpha * next_policy_log_prob
-            value = rewards.unsqueeze(1) + (1-torch.from_numpy(terminals).to(mean.device).float().unsqueeze(1)) * self._gamma * next_q
+            value = rewards + (1-torch.from_numpy(terminals).to(mean.device).float().unsqueeze(1)) * self._gamma * next_q
 
-            q = torch.minimum(
+            value_baseline = torch.minimum(
                 self.critic1(observations, actions), 
                 self.critic2(observations, actions)
             )
-            advantage = q - value
+            advantage = value - value_baseline
         adv_loss = (log_prob * advantage).mean()
 
         # compute the supervised loss
         sl_input = torch.cat([sl_observations, sl_actions], dim=-1).cpu().numpy()
         sl_target = torch.cat([sl_next_observations-sl_observations, sl_rewards], dim=-1)
-        sl_input = self.dynamics.transform(sl_input)
+        sl_input = self.dynamics.scaler.transform(sl_input)
         sl_mean, sl_logvar = self.dynamics.model(sl_input)
         sl_inv_var = torch.exp(-sl_logvar)
         sl_mse_loss_inv = (torch.pow(sl_mean - sl_target, 2) * sl_inv_var).mean(dim=(1, 2))
         sl_var_loss = sl_logvar.mean(dim=(1, 2))
         sl_loss = sl_mse_loss_inv.sum() + sl_var_loss.sum()
         sl_loss = sl_loss + self.dynamics.model.get_decay_loss()
-        sl_loss = sl_loss + 0.01 * self.dynamics.model.max_logvar.sum() - 0.01 * self.dynamics.model.min_logvar.sum()
+        sl_loss = sl_loss + 0.001 * self.dynamics.model.max_logvar.sum() - 0.001 * self.dynamics.model.min_logvar.sum()
 
         all_loss = self._adv_weight * adv_loss + sl_loss
         self._dynmics_adv_optim.zero_grad()
@@ -190,7 +194,7 @@ class RAMBOPolicy(MOPOPolicy):
         self._dynmics_adv_optim.step()
 
         return next_observations.cpu().numpy(), terminals, {
-            "all_loss": all_loss.cpu().item(), 
-            "sl_loss": sl_loss.cpu().item(), 
-            "adv_loss": adv_loss.cpu().item()
+            "adv_dynamics_update/all_loss": all_loss.cpu().item(), 
+            "adv_dynamics_update/sl_loss": sl_loss.cpu().item(), 
+            "adv_dynamics_update/adv_loss": adv_loss.cpu().item()
         }
