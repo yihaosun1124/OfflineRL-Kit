@@ -59,7 +59,7 @@ class RAMBOPolicy(MOPOPolicy):
         self.device = device
         
     def load(self, path):
-        self.load_state_dict(torch.load(os.path.join(path, "rambo.pt"), map_location="cpu"))
+        self.load_state_dict(torch.load(os.path.join(path, "rambo_pretrain.pt"), map_location="cpu"))
 
     def pretrain(self, data: Dict, n_epoch, batch_size, lr, logger) -> None:
         self._bc_optim = torch.optim.Adam(self.actor.parameters(), lr=lr)
@@ -97,11 +97,11 @@ class RAMBOPolicy(MOPOPolicy):
         real_buffer, 
     ) -> Tuple[Dict[str, np.ndarray], Dict]:
         all_loss_info = {
-            "all_loss": 0, 
-            "sl_loss": 0, 
-            "adv_loss": 0
+            "adv_dynamics_update/all_loss": 0, 
+            "adv_dynamics_update/sl_loss": 0, 
+            "adv_dynamics_update/adv_loss": 0
         }
-        self.dynamics.train()
+        # self.dynamics.train()
         steps = 0
         while steps < self._adv_train_steps:
             init_obss = real_buffer.sample(self._adv_rollout_batch_size)["observations"].cpu().numpy()
@@ -109,12 +109,10 @@ class RAMBOPolicy(MOPOPolicy):
             for t in range(self._adv_rollout_length):
                 actions = self.select_action(observations)
                 sl_observations, sl_actions, sl_next_observations, sl_rewards = \
-                    itemgetter("observations", "actions", "next_observations", "rewards")(real_buffer.sample(self._adv_batch_size))
+                    itemgetter("observations", "actions", "next_observations", "rewards")(real_buffer.sample(self._adv_rollout_batch_size))
                 next_observations, terminals, loss_info = self.dynamics_step_and_forward(observations, actions, sl_observations, sl_actions, sl_next_observations, sl_rewards)
-                all_loss_info["all_loss"] += loss_info["all_loss"]
-                all_loss_info["adv_loss"] += loss_info["adv_loss"]
-                all_loss_info["sl_loss"] += loss_info["sl_loss"]
-
+                for _key in loss_info:
+                    all_loss_info[_key] += loss_info[_key]
                 # nonterm_mask = (~terminals).flatten()
                 steps += 1
                 # observations = next_observations[nonterm_mask]
@@ -123,7 +121,7 @@ class RAMBOPolicy(MOPOPolicy):
                     # break
                 if steps == 1000:
                     break
-        self.dynamics.eval()
+        # self.dynamics.eval()
         return {_key: _value/steps for _key, _value in all_loss_info.items()}
 
 
@@ -138,17 +136,21 @@ class RAMBOPolicy(MOPOPolicy):
     ):
         obs_act = np.concatenate([observations, actions], axis=-1)
         obs_act = self.dynamics.scaler.transform(obs_act)
-        mean, logvar = self.dynamics.model(obs_act)
-        observations = torch.from_numpy(observations).to(mean.device)
-        mean[..., :-1] += observations
+        diff_mean, logvar = self.dynamics.model(obs_act)
+        observations = torch.from_numpy(observations).to(diff_mean.device)
+        diff_obs, diff_reward = torch.split(diff_mean, [diff_mean.shape[-1]-1, 1], dim=-1)
+        mean = torch.cat([diff_obs + observations, diff_reward], dim=-1)
+        # mean[..., :-1] = mean[..., :-1] + observations
+        # mean[..., :-1] += observations
         std = torch.sqrt(torch.exp(logvar))
         
         dist = torch.distributions.Normal(mean, std)
         ensemble_sample = dist.sample()
-        ensemble_size, batch_size, _ = ensemble_size.shape
+        ensemble_size, batch_size, _ = ensemble_sample.shape
         
         # select the next observations
-        selected_indexes = np.random.randint(0, ensemble_size, size=batch_size)    # CHECK 这里有可能应该使用所有模型
+        selected_indexes = self.dynamics.model.random_elite_idxs(batch_size)
+        # selected_indexes = np.random.randint(0, ensemble_size, size=batch_size)    # CHECK 这里有可能应该使用所有模型
         sample = ensemble_sample[selected_indexes, np.arange(batch_size)]
         next_observations = sample[..., :-1]
         rewards = sample[..., -1:]

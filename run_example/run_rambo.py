@@ -26,7 +26,7 @@ from offlinerlkit.policy import RAMBOPolicy
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="rambo")
-    parser.add_argument("--task", type=str, default="hopper-medium-replay-v2")
+    parser.add_argument("--task", type=str, default="hopper-medium-v2")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--actor-lr", type=float, default=1e-4)
     parser.add_argument("--critic-lr", type=float, default=3e-4)
@@ -62,7 +62,7 @@ def get_args():
 
     parser.add_argument("--include-ent-in-adv", type=int, default=0)
     parser.add_argument("--do-bc", type=int, default=1)
-    parser.add_argument("--load-bc", type=str, default=None)
+    parser.add_argument("--load-bc-path", type=str, default=None)
     parser.add_argument("--bc-lr", type=float, default=1e-4)
     parser.add_argument("--bc-epoch", type=int, default=50)
     parser.add_argument("--bc-batch-size", type=int, default=256)
@@ -224,14 +224,14 @@ def train(args=get_args()):
     )
 
     # train
-    if args.load_bc_path is not None:
-        policy.load(args.load_bc)
+    if args.load_bc_path:
+        policy.load(args.load_bc_path)
         policy.to(args.device)
     else:
         policy.pretrain(real_buffer.sample_all(), args.bc_epoch, args.bc_batch_size, args.bc_lr, logger)
     if args.load_dynamics_path:
         dynamics.load(args.load_dynamics_path)
-        dynamics.to(args.device)
+        # dynamics.to(args.device)
     else:
         dynamics.train(real_buffer.sample_all(), logger)
 

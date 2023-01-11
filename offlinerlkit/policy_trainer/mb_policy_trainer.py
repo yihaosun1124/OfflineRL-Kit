@@ -101,23 +101,24 @@ class MBPolicyTrainer:
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
             
-            # evaluate current policy
-            eval_info = self._evaluate()
-            ep_reward_mean, ep_reward_std = np.mean(eval_info["eval/episode_reward"]), np.std(eval_info["eval/episode_reward"])
-            ep_length_mean, ep_length_std = np.mean(eval_info["eval/episode_length"]), np.std(eval_info["eval/episode_length"])
-            norm_ep_rew_mean = self.eval_env.get_normalized_score(ep_reward_mean) * 100
-            norm_ep_rew_std = self.eval_env.get_normalized_score(ep_reward_std) * 100
-            last_10_performance.append(norm_ep_rew_mean)
+            if e % 10 == 0:
+                # evaluate current policy
+                eval_info = self._evaluate()
+                ep_reward_mean, ep_reward_std = np.mean(eval_info["eval/episode_reward"]), np.std(eval_info["eval/episode_reward"])
+                ep_length_mean, ep_length_std = np.mean(eval_info["eval/episode_length"]), np.std(eval_info["eval/episode_length"])
+                norm_ep_rew_mean = self.eval_env.get_normalized_score(ep_reward_mean) * 100
+                norm_ep_rew_std = self.eval_env.get_normalized_score(ep_reward_std) * 100
+                last_10_performance.append(norm_ep_rew_mean)
 
-            self.logger.logkv("eval/normalized_episode_reward", norm_ep_rew_mean)
-            self.logger.logkv("eval/normalized_episode_reward_std", norm_ep_rew_std)
-            self.logger.logkv("eval/episode_length", ep_length_mean)
-            self.logger.logkv("eval/episode_length_std", ep_length_std)
-            self.logger.set_timestep(num_timesteps)
-            self.logger.dumpkvs(exclude=["dynamics_training_progress"])
-        
-            # save checkpoint
-            torch.save(self.policy.state_dict(), os.path.join(self.logger.checkpoint_dir, "policy.pth"))
+                self.logger.logkv("eval/normalized_episode_reward", norm_ep_rew_mean)
+                self.logger.logkv("eval/normalized_episode_reward_std", norm_ep_rew_std)
+                self.logger.logkv("eval/episode_length", ep_length_mean)
+                self.logger.logkv("eval/episode_length_std", ep_length_std)
+                self.logger.set_timestep(num_timesteps)
+                self.logger.dumpkvs(exclude=["dynamics_training_progress"])
+            
+                # save checkpoint
+                torch.save(self.policy.state_dict(), os.path.join(self.logger.checkpoint_dir, "policy.pth"))
 
         self.logger.log("total time: {:.2f}s".format(time.time() - start_time))
         torch.save(self.policy.state_dict(), os.path.join(self.logger.model_dir, "policy.pth"))
