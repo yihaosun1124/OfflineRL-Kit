@@ -99,7 +99,9 @@ class RAMBOPolicy(MOPOPolicy):
         all_loss_info = {
             "adv_dynamics_update/all_loss": 0, 
             "adv_dynamics_update/sl_loss": 0, 
-            "adv_dynamics_update/adv_loss": 0
+            "adv_dynamics_update/adv_loss": 0, 
+            "adv_dynamics_update/adv_advantage": 0, 
+            "adv_dynamics_update/adv_log_prob": 0, 
         }
         # self.dynamics.train()
         steps = 0
@@ -150,7 +152,6 @@ class RAMBOPolicy(MOPOPolicy):
         
         # select the next observations
         selected_indexes = self.dynamics.model.random_elite_idxs(batch_size)
-        # selected_indexes = np.random.randint(0, ensemble_size, size=batch_size)    # CHECK 这里有可能应该使用所有模型
         sample = ensemble_sample[selected_indexes, np.arange(batch_size)]
         next_observations = sample[..., :-1]
         rewards = sample[..., -1:]
@@ -158,6 +159,7 @@ class RAMBOPolicy(MOPOPolicy):
 
         # compute logprob
         log_prob = dist.log_prob(sample)
+        log_prob = log_prob[self.dynamics.model.elites.data, ...]
         log_prob = log_prob.exp().mean(dim=0).log().sum(-1)
 
         # compute the advantage
@@ -176,7 +178,8 @@ class RAMBOPolicy(MOPOPolicy):
                 self.critic2(observations, actions)
             )
             advantage = value - value_baseline
-        adv_loss = (log_prob * advantage).mean()
+            advantage = (advantage - advantage.mean()) / (advantage.std()+1e-6)
+        adv_loss = (log_prob * advantage).sum()
 
         # compute the supervised loss
         sl_input = torch.cat([sl_observations, sl_actions], dim=-1).cpu().numpy()
@@ -198,5 +201,7 @@ class RAMBOPolicy(MOPOPolicy):
         return next_observations.cpu().numpy(), terminals, {
             "adv_dynamics_update/all_loss": all_loss.cpu().item(), 
             "adv_dynamics_update/sl_loss": sl_loss.cpu().item(), 
-            "adv_dynamics_update/adv_loss": adv_loss.cpu().item()
+            "adv_dynamics_update/adv_loss": adv_loss.cpu().item(), 
+            "adv_dynamics_update/adv_advantage": advantage.mean().cpu().item(), 
+            "adv_dynamics_update/adv_log_prob": log_prob.mean().cpu().item(), 
         }

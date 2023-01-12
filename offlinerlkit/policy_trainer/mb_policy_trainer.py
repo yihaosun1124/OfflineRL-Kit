@@ -78,6 +78,8 @@ class MBPolicyTrainer:
                         "num rollout transitions: {}, reward mean: {:.4f}".\
                             format(rollout_info["num_transitions"], rollout_info["reward_mean"])
                     )
+                    for _key, _value in rollout_transitions.items():
+                        self.logger.logkv_mean("rollout_info/"+_key, _value)
 
                 real_sample_size = int(self._batch_size * self._real_ratio)
                 fake_sample_size = self._batch_size - real_sample_size
@@ -122,6 +124,7 @@ class MBPolicyTrainer:
 
         self.logger.log("total time: {:.2f}s".format(time.time() - start_time))
         torch.save(self.policy.state_dict(), os.path.join(self.logger.model_dir, "policy.pth"))
+        self.policy.dynamics.save(self.logger.model_dir)
         self.logger.close()
     
         return {"last_10_performance": np.mean(last_10_performance)}
