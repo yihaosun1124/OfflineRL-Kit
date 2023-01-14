@@ -78,7 +78,7 @@ class MBPolicyTrainer:
                         "num rollout transitions: {}, reward mean: {:.4f}".\
                             format(rollout_info["num_transitions"], rollout_info["reward_mean"])
                     )
-                    for _key, _value in rollout_transitions.items():
+                    for _key, _value in rollout_info.items():
                         self.logger.logkv_mean("rollout_info/"+_key, _value)
 
                 real_sample_size = int(self._batch_size * self._real_ratio)
