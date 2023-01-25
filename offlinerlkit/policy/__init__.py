@@ -10,11 +10,7 @@ from offlinerlkit.policy.model_free.td3bc import TD3BCPolicy
 
 # model based
 from offlinerlkit.policy.model_based.mopo import MOPOPolicy
-from offlinerlkit.policy.model_based.mope import MOPEPolicy
-from offlinerlkit.policy.model_based.cmopo import CMOPOPolicy
-from offlinerlkit.policy.model_based.mopo_ensemble import MOPOEnsemblePolicy
 from offlinerlkit.policy.model_based.mobile import MOBILEPolicy
-from offlinerlkit.policy.model_based.mobile_ensemble import MOBILEEnsemblePolicy
 
 
 __all__ = [
@@ -26,9 +22,5 @@ __all__ = [
     "MCQPolicy",
     "TD3BCPolicy",
     "MOPOPolicy",
-    "MOPEPolicy",
-    "CMOPOPolicy",
-    "MOPOEnsemblePolicy",
     "MOBILEPolicy",
-    "MOBILEEnsemble"
 ]

@@ -5,12 +5,13 @@ import gym
 
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple
+from copy import deepcopy
 from collections import defaultdict
-from offlinerlkit.policy import SACPolicy
+from offlinerlkit.policy import BasePolicy
 from offlinerlkit.dynamics import BaseDynamics
 
 
-class MOBILEPolicy(SACPolicy):
+class MOBILEPolicy(BasePolicy):
     """
     Model-Bellman Inconsistancy Penalized Offline Reinforcement Learning
     """
@@ -19,35 +20,76 @@ class MOBILEPolicy(SACPolicy):
         self,
         dynamics: BaseDynamics,
         actor: nn.Module,
-        critic1: nn.Module,
-        critic2: nn.Module,
+        critics: nn.ModuleList,
         actor_optim: torch.optim.Optimizer,
-        critic1_optim: torch.optim.Optimizer,
-        critic2_optim: torch.optim.Optimizer,
+        critics_optim: torch.optim.Optimizer,
         tau: float = 0.005,
         gamma: float  = 0.99,
         alpha: Union[float, Tuple[float, torch.Tensor, torch.optim.Optimizer]] = 0.2,
         penalty_coef: float = 1.0,
         num_samples: int = 10,
-        deterministic_backup=False
+        deterministic_backup: bool = False
     ) -> None:
-        super().__init__(
-            actor,
-            critic1,
-            critic2,
-            actor_optim,
-            critic1_optim,
-            critic2_optim,
-            tau=tau,
-            gamma=gamma,
-            alpha=alpha
-        )
 
+        super().__init__()
         self.dynamics = dynamics
+        self.actor = actor
+        self.critics = critics
+        self.critics_old = deepcopy(critics)
+        self.critics_old.eval()
+
+        self.actor_optim = actor_optim
+        self.critics_optim = critics_optim
+
+        self._tau = tau
+        self._gamma = gamma
+
+        self._is_auto_alpha = False
+        if isinstance(alpha, tuple):
+            self._is_auto_alpha = True
+            self._target_entropy, self._log_alpha, self.alpha_optim = alpha
+            self._alpha = self._log_alpha.detach().exp()
+        else:
+            self._alpha = alpha
+
         self._penalty_coef = penalty_coef
         self._num_samples = num_samples
-        self._deterministic_backup = deterministic_backup
+        self._deteterministic_backup = deterministic_backup
 
+    def train(self) -> None:
+        self.actor.train()
+        self.critics.train()
+
+    def eval(self) -> None:
+        self.actor.eval()
+        self.critics.eval()
+
+    def _sync_weight(self) -> None:
+        for o, n in zip(self.critics_old.parameters(), self.critics.parameters()):
+            o.data.copy_(o.data * (1.0 - self._tau) + n.data * self._tau)
+    
+    def actforward(
+        self,
+        obs: torch.Tensor,
+        deterministic: bool = False
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        dist = self.actor(obs)
+        if deterministic:
+            squashed_action, raw_action = dist.mode()
+        else:
+            squashed_action, raw_action = dist.rsample()
+        log_prob = dist.log_prob(squashed_action, raw_action)
+        return squashed_action, log_prob
+
+    def select_action(
+        self,
+        obs: np.ndarray,
+        deterministic: bool = False
+    ) -> np.ndarray:
+        with torch.no_grad():
+            action, _ = self.actforward(obs, deterministic)
+        return action.cpu().numpy()
+    
     def rollout(
         self,
         init_obss: np.ndarray,
@@ -92,25 +134,12 @@ class MOBILEPolicy(SACPolicy):
         num_samples, num_ensembles, batch_size, obs_dim = pred_next_obss.shape
         pred_next_obss = pred_next_obss.reshape(-1, obs_dim)
         pred_next_actions, _ = self.actforward(pred_next_obss)
-
-        pred_next_qs = torch.min(self.critic1_old(pred_next_obss, pred_next_actions), self.critic2_old(pred_next_obss, pred_next_actions))\
-            .reshape(num_samples, num_ensembles, batch_size, 1)
+        
+        pred_next_qs =  torch.cat([critic_old(pred_next_obss, pred_next_actions) for critic_old in self.critics_old], 1)
+        pred_next_qs = torch.min(pred_next_qs, 1)[0].reshape(num_samples, num_ensembles, batch_size, 1)
         penalty = pred_next_qs.mean(0).std(0)
 
         return penalty
-    
-    @ torch.no_grad()
-    def compute_bellman_error(self, real_next_obss: torch.Tensor, pred_next_obss: torch.Tensor):
-        real_next_actions, _ = self.actforward(real_next_obss)
-        pred_next_actions, _ = self.actforward(pred_next_obss)
-        real_next_qs = torch.min(self.critic1_old(real_next_obss, real_next_actions), self.critic2_old(real_next_obss, real_next_actions))
-        pred_next_qs = torch.min(self.critic1_old(pred_next_obss, pred_next_actions), self.critic2_old(pred_next_obss, pred_next_actions))
-        return torch.abs(real_next_qs - pred_next_qs)
-
-    @ torch.no_grad()
-    def compute_q_value(self, obss: torch.Tensor, actions: torch.Tensor):
-        q_values = torch.min(self.critic1_old(obss, actions), self.critic2_old(obss, actions))
-        return q_values.mean().cpu().numpy()
 
     def learn(self, batch: Dict) -> Dict[str, float]:
         real_batch, fake_batch = batch["real"], batch["fake"]
@@ -119,36 +148,28 @@ class MOBILEPolicy(SACPolicy):
         obss, actions, next_obss, rewards, terminals = mix_batch["observations"], mix_batch["actions"], mix_batch["next_observations"], mix_batch["rewards"], mix_batch["terminals"]
 
         # update critic
-        q1, q2 = self.critic1(obss, actions), self.critic2(obss, actions)
+        qs = torch.stack([critic(obss, actions) for critic in self.critics], 0)
         with torch.no_grad():
             penalty = self.compute_lcb(obss, actions)
             penalty[:len(real_batch["rewards"])] = 0.0
 
             next_actions, next_log_probs = self.actforward(next_obss)
-            next_q = torch.min(
-                self.critic1_old(next_obss, next_actions),
-                self.critic2_old(next_obss, next_actions)
-            )
-            if not self._deterministic_backup:
+            next_qs = torch.cat([critic_old(next_obss, next_actions) for critic_old in self.critics_old], 1)
+            next_q = torch.min(next_qs, 1)[0].reshape(-1, 1)
+            if not self._deteterministic_backup:
                 next_q -= self._alpha * next_log_probs
             target_q = (rewards - self._penalty_coef * penalty) + self._gamma * (1 - terminals) * next_q
             target_q = torch.clamp(target_q, 0, None)
 
-        critic1_loss = ((q1 - target_q).pow(2)).mean()
-        self.critic1_optim.zero_grad()
-        critic1_loss.backward()
-        self.critic1_optim.step()
-
-        critic2_loss = ((q2 - target_q).pow(2)).mean()
-        self.critic2_optim.zero_grad()
-        critic2_loss.backward()
-        self.critic2_optim.step()
+        critic_loss = ((qs - target_q) ** 2).mean()
+        self.critics_optim.zero_grad()
+        critic_loss.backward()
+        self.critics_optim.step()
 
         # update actor
         a, log_probs = self.actforward(obss)
-        q1a, q2a = self.critic1(obss, a), self.critic2(obss, a)
-
-        actor_loss = - torch.min(q1a, q2a).mean() + self._alpha * log_probs.mean()
+        qas = torch.cat([critic(obss, a) for critic in self.critics], 1)
+        actor_loss = -torch.min(qas, 1)[0].mean() + self._alpha * log_probs.mean()
         self.actor_optim.zero_grad()
         actor_loss.backward()
         self.actor_optim.step()
@@ -165,8 +186,7 @@ class MOBILEPolicy(SACPolicy):
 
         result = {
             "loss/actor": actor_loss.item(),
-            "loss/critic1": critic1_loss.item(),
-            "loss/critic2": critic2_loss.item(),
+            "loss/critic": critic_loss.item()
         }
 
         if self._is_auto_alpha:
