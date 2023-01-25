@@ -136,7 +136,7 @@ class EnsembleDynamics(BaseDynamics):
     ) -> None:
         inputs, targets = self.format_samples_for_training(data)
         data_size = inputs.shape[0]
-        holdout_size = min(int(data_size * 0.2), 1000)
+        holdout_size = min(int(data_size * 0.15), 1000)
         train_size = data_size - holdout_size
         train_splits, holdout_splits = torch.utils.data.random_split(range(data_size), (train_size, holdout_size))
         train_inputs, train_targets = inputs[train_splits.indices], targets[train_splits.indices]
@@ -208,7 +208,7 @@ class EnsembleDynamics(BaseDynamics):
             var_loss = logvar.mean(dim=(1, 2))
             loss = mse_loss_inv.sum() + var_loss.sum()
             loss = loss + self.model.get_decay_loss()
-            loss = loss + 0.01 * self.model.max_logvar.sum() - 0.01 * self.model.min_logvar.sum()
+            loss = loss + 0.001 * self.model.max_logvar.sum() - 0.001 * self.model.min_logvar.sum()
 
             self.optim.zero_grad()
             loss.backward()

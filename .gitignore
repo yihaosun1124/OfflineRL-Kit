@@ -7,3 +7,5 @@
 **/*.egg-info
 **/*.png
 **/*.txt
+**/.vscode
+**/_log

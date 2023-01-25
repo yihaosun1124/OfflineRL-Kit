@@ -11,6 +11,7 @@ from offlinerlkit.policy.model_free.td3bc import TD3BCPolicy
 # model based
 from offlinerlkit.policy.model_based.mopo import MOPOPolicy
 from offlinerlkit.policy.model_based.mobile import MOBILEPolicy
+from offlinerlkit.policy.model_based.rambo import RAMBOPolicy
 
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "TD3BCPolicy",
     "MOPOPolicy",
     "MOBILEPolicy",
+    "RAMBOPolicy"
 ]

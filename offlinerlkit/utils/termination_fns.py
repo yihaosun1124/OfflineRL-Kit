@@ -1,5 +1,11 @@
 import numpy as np
 
+def obs_unnormalization(termination_fn, obs_mean, obs_std):
+    def thunk(obs, act, next_obs):
+        obs = obs*obs_std + obs_mean
+        next_obs = next_obs*obs_std + obs_mean
+        return termination_fn(obs, act, next_obs)
+    return thunk
 
 def termination_fn_halfcheetah(obs, act, next_obs):
     assert len(obs.shape) == len(next_obs.shape) == len(act.shape) == 2
