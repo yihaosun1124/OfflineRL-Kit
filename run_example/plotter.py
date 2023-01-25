@@ -74,11 +74,14 @@ def plot_figure(
     results,
     x_label,
     y_label,
+    xlim=None,
+    ylim=None,
     title=None,
     smooth_radius=10,
     figsize=None,
     dpi=None,
-    color_list=None
+    color_list=None,
+    legend_outside=False
 ):
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
     if color_list == None:
@@ -94,7 +97,55 @@ def plot_figure(
     ax.set_title(title, fontdict={'size': 10})
     ax.set_xlabel(x_label, fontdict={'size': 10})
     ax.set_ylabel(y_label, fontdict={'size': 10})
-    ax.legend(loc=4, prop={'size': 10})
+    if xlim is not None:
+        ax.set_xlim(*xlim)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    if legend_outside:
+        ax.legend(loc=2, bbox_to_anchor=(1,1), prop={'size': 10})
+    else:
+        ax.legend(prop={'size': 10})
+
+
+def plot_func(
+    root_dir,
+    task,
+    algos,
+    query_file,
+    query_x,
+    query_y,
+    xlabel,
+    ylabel,
+    xlim=None,
+    ylim=None,
+    title=None,
+    smooth_radius=10,
+    figsize=None,
+    dpi=None,
+    colors=None,
+    legend_outside=False
+):
+    results = {}
+    for algo in algos:
+        path = os.path.join(root_dir, task, algo)
+        csv_file = merge_csv(path, query_file, query_x, query_y)
+        results[algo] = csv_file
+
+    plt.style.use('seaborn')
+    plot_figure(
+        results=results,
+        x_label=xlabel,
+        y_label=ylabel,
+        xlim=xlim,
+        ylim=ylim,
+        title=title,
+        smooth_radius=smooth_radius,
+        figsize=figsize,
+        dpi=dpi,
+        color_list=colors,
+        legend_outside=legend_outside
+    )
+    plt.show()
     
 
 if __name__ == "__main__":

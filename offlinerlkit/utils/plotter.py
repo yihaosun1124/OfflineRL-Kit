@@ -97,8 +97,8 @@ def plot_figure(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="plotter")
     parser.add_argument("--root-dir", default="log")
-    parser.add_argument("--task", default="hopper-medium-replay-v2")
-    parser.add_argument("--algos", type=str, nargs='*', default=["mopo"])
+    parser.add_argument("--task", default="walker2d-medium-v2")
+    parser.add_argument("--algos", type=str, nargs='*', default=["mopo&penalty_coef=0.5&rollout_length=5"])
     parser.add_argument("--query-file", default="policy_training_progress.csv")
     parser.add_argument("--query-x", default="timestep")
     parser.add_argument("--query-y", default="eval/normalized_episode_reward")

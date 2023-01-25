@@ -1,6 +1,4 @@
 import argparse
-import os
-import sys
 import random
 
 import gym
@@ -26,18 +24,21 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="mobile")
     parser.add_argument("--task", type=str, default="walker2d-medium-expert-v2")
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--actor-lr", type=float, default=1e-4)
     parser.add_argument("--critic-lr", type=float, default=3e-4)
     parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256])
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.005)
     parser.add_argument("--alpha", type=float, default=0.2)
-    parser.add_argument("--auto-alpha", default=True)
+    parser.add_argument("--auto-alpha", type=bool, default=True)
     parser.add_argument("--target-entropy", type=int, default=None)
     parser.add_argument("--alpha-lr", type=float, default=1e-4)
 
+    parser.add_argument("--num-q-ensemble", type=int, default=2)
+
     parser.add_argument("--dynamics-lr", type=float, default=1e-3)
+    parser.add_argument("--max-epochs-since-update", type=int, default=5)
     parser.add_argument("--dynamics-hidden-dims", type=int, nargs='*', default=[200, 200, 200, 200])
     parser.add_argument("--dynamics-weight-decay", type=float, nargs='*', default=[2.5e-5, 5e-5, 7.5e-5, 7.5e-5, 1e-4])
     parser.add_argument("--n-ensemble", type=int, default=7)
@@ -55,6 +56,7 @@ def get_args():
     parser.add_argument("--step-per-epoch", type=int, default=1000)
     parser.add_argument("--eval_episodes", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--lr-scheduler", type=bool, default=True)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
 
     return parser.parse_args()
@@ -78,8 +80,6 @@ def train(args=get_args()):
 
     # create policy model
     actor_backbone = MLP(input_dim=np.prod(args.obs_shape), hidden_dims=args.hidden_dims)
-    critic1_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
-    critic2_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
     dist = TanhDiagGaussian(
         latent_dim=getattr(actor_backbone, "output_dim"),
         output_dim=args.action_dim,
@@ -87,13 +87,18 @@ def train(args=get_args()):
         conditioned_sigma=True
     )
     actor = ActorProb(actor_backbone, dist, args.device)
-    critic1 = Critic(critic1_backbone, args.device)
-    critic2 = Critic(critic2_backbone, args.device)
     actor_optim = torch.optim.Adam(actor.parameters(), lr=args.actor_lr)
-    critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.critic_lr)
-    critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.critic_lr)
+    critics = []
+    for i in range(args.num_q_ensemble):
+        critic_backbone = MLP(input_dim=np.prod(args.obs_shape) + args.action_dim, hidden_dims=args.hidden_dims)
+        critics.append(Critic(critic_backbone, args.device))
+    critics = torch.nn.ModuleList(critics)
+    critics_optim = torch.optim.Adam(critics.parameters(), lr=args.critic_lr)
 
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(actor_optim, args.epoch)
+    if args.lr_scheduler:
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(actor_optim, args.epoch)
+    else:
+        lr_scheduler = None
 
     if args.auto_alpha:
         target_entropy = args.target_entropy if args.target_entropy \
@@ -140,16 +145,15 @@ def train(args=get_args()):
     policy = MOBILEPolicy(
         dynamics,
         actor,
-        critic1,
-        critic2,
+        critics,
         actor_optim,
-        critic1_optim,
-        critic2_optim,
+        critics_optim,
         tau=args.tau,
         gamma=args.gamma,
         alpha=alpha,
         penalty_coef=args.penalty_coef,
-        num_samples=args.num_samples
+        num_samples=args.num_samples,
+        deterministic_backup=True
     )
 
     # create buffer
@@ -175,7 +179,7 @@ def train(args=get_args()):
     )
 
     # log
-    log_dirs = make_log_dirs(args.task, args.algo_name, args.seed, vars(args), record_params=["penalty_coef", "rollout_length", "real_ratio", "auto_alpha"])
+    log_dirs = make_log_dirs(args.task, args.algo_name, args.seed, vars(args), record_params=["penalty_coef", "rollout_length", "real_ratio"])
     # key: output file name, value: output handler type
     output_config = {
         "consoleout_backup": "stdout",
@@ -205,7 +209,7 @@ def train(args=get_args()):
 
     # train
     if not load_dynamics_model:
-        dynamics.train(real_buffer.sample_all(), logger, max_epochs_since_update=5)
+        dynamics.train(real_buffer.sample_all(), logger, max_epochs_since_update=args.max_epochs_since_update)
     
     policy_trainer.train()
 

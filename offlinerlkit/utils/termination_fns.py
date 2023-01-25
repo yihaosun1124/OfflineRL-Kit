@@ -112,6 +112,14 @@ def termination_fn_pen(obs, act, next_obs):
     done = done[:,None]
     return done
 
+def terminaltion_fn_door(obs, act, next_obs):
+    assert len(obs.shape) == len(next_obs.shape) == len(act.shape) == 2
+
+    done = np.array([False] * obs.shape[0])
+
+    done = done[:, None]
+    return done
+
 def get_termination_fn(task):
     if 'halfcheetahvel' in task:
         return termination_fn_halfcheetahveljump
@@ -135,5 +143,7 @@ def get_termination_fn(task):
         return termination_fn_humanoid
     elif 'pen' in task:
         return termination_fn_pen
+    elif 'door' in task:
+        return terminaltion_fn_door
     else:
         raise np.zeros
