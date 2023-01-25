@@ -12,7 +12,7 @@ import torch
 
 from offlinerlkit.nets import MLP
 from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDynamicsModel
-from offlinerlkit.dynamics import EnsembleDynamics, MujocoOracleDynamics
+from offlinerlkit.dynamics import EnsembleDynamics
 from offlinerlkit.utils.scaler import StandardScaler
 from offlinerlkit.utils.termination_fns import get_termination_fn
 from offlinerlkit.utils.load_dataset import qlearning_dataset
@@ -136,8 +136,6 @@ def train(args=get_args()):
     if args.load_dynamics_path:
         dynamics.load(args.load_dynamics_path)
 
-    oracle_dynamics = MujocoOracleDynamics(env)
-
     # create policy
     policy = MOPOPolicy(
         dynamics,
@@ -196,8 +194,7 @@ def train(args=get_args()):
         batch_size=args.batch_size,
         real_ratio=args.real_ratio,
         eval_episodes=args.eval_episodes,
-        lr_scheduler=lr_scheduler,
-        oracle_dynamics=oracle_dynamics
+        lr_scheduler=lr_scheduler
     )
 
     # train

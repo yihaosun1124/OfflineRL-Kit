@@ -28,9 +28,7 @@ class MBPolicyTrainer:
         batch_size: int = 256,
         real_ratio: float = 0.05,
         eval_episodes: int = 10,
-        # normalize_obs: bool = False,
         lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
-        oracle_dynamics=None, 
         dynamics_update_freq: int = 0, 
         obs_mean: Optional[np.ndarray]=None, 
         obs_std: Optional[np.ndarray]=None
@@ -55,8 +53,6 @@ class MBPolicyTrainer:
         if self._obs_mean is None or self._obs_std is None:
             self._obs_mean, self._obs_std = 0, 1
         self.lr_scheduler = lr_scheduler
-
-        self.oracle_dynamics = oracle_dynamics
 
     def train(self) -> Dict[str, float]:
         start_time = time.time()
@@ -137,7 +133,6 @@ class MBPolicyTrainer:
         episode_reward, episode_length = 0, 0
 
         while num_episodes < self._eval_episodes:
-            # if self._normalize_obs:
             obs = (np.array(obs).reshape(1,-1) - self._obs_mean) / self._obs_std
             action = self.policy.select_action(obs, deterministic=True)
             next_obs, reward, terminal, _ = self.eval_env.step(action.flatten())

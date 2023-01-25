@@ -132,11 +132,14 @@ class EnsembleDynamics(BaseDynamics):
         data: Dict,
         logger: Logger,
         max_epochs: Optional[float] = None,
-        max_epochs_since_update: int = 10
+        max_epochs_since_update: int = 5,
+        batch_size: int = 256,
+        holdout_ratio: float = 0.2,
+        logvar_loss_coef: float = 0.01
     ) -> None:
         inputs, targets = self.format_samples_for_training(data)
         data_size = inputs.shape[0]
-        holdout_size = min(int(data_size * 0.15), 1000)
+        holdout_size = min(int(data_size * holdout_ratio), 1000)
         train_size = data_size - holdout_size
         train_splits, holdout_splits = torch.utils.data.random_split(range(data_size), (train_size, holdout_size))
         train_inputs, train_targets = inputs[train_splits.indices], targets[train_splits.indices]
@@ -157,7 +160,7 @@ class EnsembleDynamics(BaseDynamics):
         logger.log("Training dynamics:")
         while True:
             epoch += 1
-            train_loss = self.learn(train_inputs[data_idxes], train_targets[data_idxes])
+            train_loss = self.learn(train_inputs[data_idxes], train_targets[data_idxes], batch_size, logvar_loss_coef)
             new_holdout_losses = self.validate(holdout_inputs, holdout_targets)
             holdout_loss = (np.sort(new_holdout_losses)[:self.model.num_elites]).mean()
             logger.logkv("loss/dynamics_train_loss", train_loss)
@@ -191,7 +194,13 @@ class EnsembleDynamics(BaseDynamics):
         self.model.eval()
         logger.log("elites:{} , holdout loss: {}".format(indexes, (np.sort(holdout_losses)[:self.model.num_elites]).mean()))
     
-    def learn(self, inputs: np.ndarray, targets: np.ndarray, batch_size: int = 256) -> float:
+    def learn(
+        self,
+        inputs: np.ndarray,
+        targets: np.ndarray,
+        batch_size: int = 256,
+        logvar_loss_coef: float = 0.01
+    ) -> float:
         self.model.train()
         train_size = inputs.shape[1]
         losses = []
@@ -208,7 +217,7 @@ class EnsembleDynamics(BaseDynamics):
             var_loss = logvar.mean(dim=(1, 2))
             loss = mse_loss_inv.sum() + var_loss.sum()
             loss = loss + self.model.get_decay_loss()
-            loss = loss + 0.001 * self.model.max_logvar.sum() - 0.001 * self.model.min_logvar.sum()
+            loss = loss + logvar_loss_coef * self.model.max_logvar.sum() - logvar_loss_coef * self.model.min_logvar.sum()
 
             self.optim.zero_grad()
             loss.backward()

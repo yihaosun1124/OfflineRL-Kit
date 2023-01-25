@@ -59,7 +59,7 @@ class RAMBOPolicy(MOPOPolicy):
         self.device = device
         
     def load(self, path):
-        self.load_state_dict(torch.load(os.path.join(path, "rambo_pretrain.pt"), map_location="cpu"))
+        self.load_state_dict(torch.load(os.path.join(path, "rambo_pretrain.pth"), map_location=self.device))
 
     def pretrain(self, data: Dict, n_epoch, batch_size, lr, logger) -> None:
         self._bc_optim = torch.optim.Adam(self.actor.parameters(), lr=lr)
@@ -90,7 +90,7 @@ class RAMBOPolicy(MOPOPolicy):
             # logger.logkv("loss/pretrain_bc", sum_loss/i_batch)
             # logger.set_timestep(i_epoch)
             # logger.dumpkvs(exclude)
-        torch.save(self.state_dict(), os.path.join(logger.model_dir, "rambo_pretrain.pt"))
+        torch.save(self.state_dict(), os.path.join(logger.model_dir, "rambo_pretrain.pth"))
 
     def update_dynamics(
         self, 

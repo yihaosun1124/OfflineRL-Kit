@@ -1,6 +1,4 @@
 import argparse
-import os
-import sys
 import random
 
 import gym
@@ -13,7 +11,6 @@ import torch
 from offlinerlkit.nets import MLP
 from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDynamicsModel
 from offlinerlkit.dynamics import EnsembleDynamics
-from offlinerlkit.dynamics import MujocoOracleDynamics
 from offlinerlkit.utils.scaler import StandardScaler
 from offlinerlkit.utils.termination_fns import get_termination_fn, obs_unnormalization
 from offlinerlkit.utils.load_dataset import qlearning_dataset
@@ -104,10 +101,6 @@ def train(args=get_args()):
     actor_optim = torch.optim.Adam(actor.parameters(), lr=args.actor_lr)
     critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.critic_lr)
     critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.critic_lr)
-
-    # CHECK: do anealing?
-    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(actor_optim, args.epoch)
-    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(actor_optim, 1, -1)
     
     if args.auto_alpha:
         target_entropy = args.target_entropy if args.target_entropy \
@@ -169,9 +162,6 @@ def train(args=get_args()):
         termination_fn,
     )
 
-
-    oracle_dynamics = MujocoOracleDynamics(env)
-
     # create policy
     policy = RAMBOPolicy(
         dynamics, 
@@ -216,9 +206,7 @@ def train(args=get_args()):
         step_per_epoch=args.step_per_epoch,
         batch_size=args.batch_size,
         real_ratio=args.real_ratio,
-        eval_episodes=args.eval_episodes, 
-        lr_scheduler=lr_scheduler, 
-        oracle_dynamics=oracle_dynamics, 
+        eval_episodes=args.eval_episodes,
         obs_mean=obs_mean, 
         obs_std=obs_std
     )
@@ -233,7 +221,7 @@ def train(args=get_args()):
         dynamics.load(args.load_dynamics_path)
         # dynamics.to(args.device)
     else:
-        dynamics.train(real_buffer.sample_all(), logger)
+        dynamics.train(real_buffer.sample_all(), logger, holdout_ratio=0.15, logvar_loss_coef=0.001)
 
     policy_trainer.train()
 

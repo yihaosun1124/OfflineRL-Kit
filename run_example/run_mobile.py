@@ -139,8 +139,6 @@ def train(args=get_args()):
     if args.load_dynamics_path:
         dynamics.load(args.load_dynamics_path)
 
-    oracle_dynamics = MujocoOracleDynamics(env)
-
     # create policy
     policy = MOBILEPolicy(
         dynamics,
@@ -203,8 +201,7 @@ def train(args=get_args()):
         batch_size=args.batch_size,
         real_ratio=args.real_ratio,
         eval_episodes=args.eval_episodes,
-        lr_scheduler=lr_scheduler,
-        oracle_dynamics=oracle_dynamics
+        lr_scheduler=lr_scheduler
     )
 
     # train
