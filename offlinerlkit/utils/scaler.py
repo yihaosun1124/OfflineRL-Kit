@@ -4,8 +4,9 @@ import torch
 
 
 class StandardScaler(object):
-    def __init__(self):
-        pass
+    def __init__(self, mu=None, std=None):
+        self.mu = mu
+        self.std = std
 
     def fit(self, data):
         """Runs two ops, one for assigning the mean of the data to the internal mean, and
@@ -53,8 +54,8 @@ class StandardScaler(object):
         self.mu = np.load(mu_path)
         self.std = np.load(std_path)
 
-    def transform_tensor(self, obs_action: torch.Tensor, device):
-        obs_action = obs_action.cpu().numpy()
-        obs_action = self.transform(obs_action)
-        obs_action = torch.tensor(obs_action, device=device)
-        return obs_action
+    def transform_tensor(self, data: torch.Tensor):
+        device = data.device
+        data = self.transform(data.cpu().numpy())
+        data = torch.tensor(data, device=device)
+        return data

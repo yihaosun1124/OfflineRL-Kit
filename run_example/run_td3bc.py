@@ -12,6 +12,7 @@ from offlinerlkit.nets import MLP
 from offlinerlkit.modules import Actor, Critic
 from offlinerlkit.utils.noise import GaussianNoise
 from offlinerlkit.utils.load_dataset import qlearning_dataset
+from offlinerlkit.utils.scaler import StandardScaler
 from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MFPolicyTrainer
@@ -51,6 +52,18 @@ def train(args=get_args()):
     args.action_dim = np.prod(env.action_space.shape)
     args.max_action = env.action_space.high[0]
 
+    # create buffer
+    buffer = ReplayBuffer(
+        buffer_size=len(dataset["observations"]),
+        obs_shape=args.obs_shape,
+        obs_dtype=np.float32,
+        action_dim=args.action_dim,
+        action_dtype=np.float32,
+        device=args.device
+    )
+    buffer.load_dataset(dataset)
+    obs_mean, obs_std = buffer.normalize_obs()
+
     # seed
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -71,6 +84,9 @@ def train(args=get_args()):
     critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.critic_lr)
     critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.critic_lr)
 
+    # scaler for normalizing observations
+    scaler = StandardScaler(mu=obs_mean, std=obs_std)
+
     # create policy
     policy = TD3BCPolicy(
         actor,
@@ -86,19 +102,9 @@ def train(args=get_args()):
         policy_noise=args.policy_noise,
         noise_clip=args.noise_clip,
         update_actor_freq=args.update_actor_freq,
-        alpha=args.alpha
+        alpha=args.alpha,
+        scaler=scaler
     )
-
-    # create buffer
-    buffer = ReplayBuffer(
-        buffer_size=len(dataset["observations"]),
-        obs_shape=args.obs_shape,
-        obs_dtype=np.float32,
-        action_dim=args.action_dim,
-        action_dtype=np.float32,
-        device=args.device
-    )
-    buffer.load_dataset(dataset)
 
     # log
     log_dirs = make_log_dirs(args.task, args.algo_name, args.seed, vars(args))
@@ -120,8 +126,7 @@ def train(args=get_args()):
         epoch=args.epoch,
         step_per_epoch=args.step_per_epoch,
         batch_size=args.batch_size,
-        eval_episodes=args.eval_episodes,
-        normalize_obs=True
+        eval_episodes=args.eval_episodes
     )
 
     # train

@@ -8,6 +8,7 @@ from torch.nn import functional as F
 from typing import Dict, Union, Tuple
 from collections import defaultdict
 from operator import itemgetter
+from offlinerlkit.utils.scaler import StandardScaler
 from offlinerlkit.policy import MOPOPolicy
 from offlinerlkit.dynamics import BaseDynamics
 
@@ -26,15 +27,16 @@ class RAMBOPolicy(MOPOPolicy):
         actor_optim: torch.optim.Optimizer,
         critic1_optim: torch.optim.Optimizer,
         critic2_optim: torch.optim.Optimizer,
-        dynamics_adv_optim: torch.optim.Optimizer, 
+        dynamics_adv_optim: torch.optim.Optimizer,
         tau: float = 0.005,
-        gamma: float  = 0.99,
-        alpha: Union[float, Tuple[float, torch.Tensor, torch.optim.Optimizer]] = 0.2, 
-        adv_weight: float=0, 
-        adv_train_steps: int=1000, 
-        adv_rollout_batch_size: int=256, 
-        adv_rollout_length: int=5, 
-        include_ent_in_adv: bool=False,   #  这里是不是False
+        gamma: float = 0.99,
+        alpha: Union[float, Tuple[float, torch.Tensor, torch.optim.Optimizer]] = 0.2,
+        adv_weight: float = 0,
+        adv_train_steps: int = 1000,
+        adv_rollout_batch_size: int = 256,
+        adv_rollout_length: int = 5,
+        include_ent_in_adv: bool = False, # 这里是不是False,
+        scaler: StandardScaler = None,
         device="cpu"
     ) -> None:
         super().__init__(
@@ -56,6 +58,7 @@ class RAMBOPolicy(MOPOPolicy):
         self._adv_rollout_batch_size = adv_rollout_batch_size
         self._adv_rollout_length = adv_rollout_length
         self._include_ent_in_adv = include_ent_in_adv
+        self.scaler = scaler
         self.device = device
         
     def load(self, path):
@@ -126,24 +129,19 @@ class RAMBOPolicy(MOPOPolicy):
         # self.dynamics.eval()
         return {_key: _value/steps for _key, _value in all_loss_info.items()}
 
-
     def dynamics_step_and_forward(
-        self, 
-        observations,  
-        actions, 
-        sl_observations, 
-        sl_actions, 
-        sl_next_observations, 
-        sl_rewards, 
+        self,
+        observations,
+        actions,
+        sl_observations,
+        sl_actions,
+        sl_next_observations,
+        sl_rewards,
     ):
         obs_act = np.concatenate([observations, actions], axis=-1)
         obs_act = self.dynamics.scaler.transform(obs_act)
-        diff_mean, logvar = self.dynamics.model(obs_act)
-        observations = torch.from_numpy(observations).to(diff_mean.device)
-        diff_obs, diff_reward = torch.split(diff_mean, [diff_mean.shape[-1]-1, 1], dim=-1)
-        mean = torch.cat([diff_obs + observations, diff_reward], dim=-1)
-        # mean[..., :-1] = mean[..., :-1] + observations
-        # mean[..., :-1] += observations
+        mean, logvar = self.dynamics.model(obs_act)
+        mean[..., :-1] += torch.from_numpy(observations).to(mean.device)
         std = torch.sqrt(torch.exp(logvar))
         
         dist = torch.distributions.Normal(mean, std)
@@ -205,3 +203,8 @@ class RAMBOPolicy(MOPOPolicy):
             "adv_dynamics_update/adv_advantage": advantage.mean().cpu().item(), 
             "adv_dynamics_update/adv_log_prob": log_prob.mean().cpu().item(), 
         }
+
+    def select_action(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
+        if self.scaler is not None:
+            obs = self.scaler.transform(obs)
+        return super().select_action(obs, deterministic)

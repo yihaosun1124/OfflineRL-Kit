@@ -6,6 +6,7 @@ from torch.nn import functional as F
 from typing import Dict, Union, Tuple, Callable
 from offlinerlkit.policy import TD3Policy
 from offlinerlkit.utils.noise import GaussianNoise
+from offlinerlkit.utils.scaler import StandardScaler
 
 
 class TD3BCPolicy(TD3Policy):
@@ -28,7 +29,8 @@ class TD3BCPolicy(TD3Policy):
         policy_noise: float = 0.2,
         noise_clip: float = 0.5,
         update_actor_freq: int = 2,
-        alpha: float = 2.5
+        alpha: float = 2.5,
+        scaler: StandardScaler = None
     ) -> None:
 
         super().__init__(
@@ -48,6 +50,7 @@ class TD3BCPolicy(TD3Policy):
         )
 
         self._alpha = alpha
+        self.scaler = scaler
     
     def train(self) -> None:
         self.actor.train()
@@ -68,6 +71,8 @@ class TD3BCPolicy(TD3Policy):
             o.data.copy_(o.data * (1.0 - self._tau) + n.data * self._tau)
     
     def select_action(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
+        if self.scaler is not None:
+            obs = self.scaler.transform(obs)
         with torch.no_grad():
             action = self.actor(obs).cpu().numpy()
         if not deterministic:

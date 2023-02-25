@@ -25,7 +25,6 @@ class MFPolicyTrainer:
         step_per_epoch: int = 1000,
         batch_size: int = 256,
         eval_episodes: int = 10,
-        normalize_obs: bool = False,
         lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None
     ) -> None:
         self.policy = policy
@@ -37,9 +36,6 @@ class MFPolicyTrainer:
         self._step_per_epoch = step_per_epoch
         self._batch_size = batch_size
         self._eval_episodes = eval_episodes
-        self._normalize_obs = normalize_obs
-        if normalize_obs:
-            self._obs_mean, self._obs_std = self.buffer.normalize_obs()
         self.lr_scheduler = lr_scheduler
 
     def train(self) -> Dict[str, float]:
@@ -97,9 +93,7 @@ class MFPolicyTrainer:
         episode_reward, episode_length = 0, 0
 
         while num_episodes < self._eval_episodes:
-            if self._normalize_obs:
-                obs = (np.array(obs).reshape(1,-1) - self._obs_mean) / self._obs_std
-            action = self.policy.select_action(obs, deterministic=True)
+            action = self.policy.select_action(obs.reshape(1,-1), deterministic=True)
             next_obs, reward, terminal, _ = self.eval_env.step(action.flatten())
             episode_reward += reward
             episode_length += 1

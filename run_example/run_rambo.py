@@ -153,14 +153,16 @@ def train(args=get_args()):
         dynamics_model.parameters(), 
         lr=args.dynamics_adv_lr
     )
-    scaler = StandardScaler()   # CHECK 这里换成dummy scaler
+    dynamics_scaler = StandardScaler()
     termination_fn = obs_unnormalization(get_termination_fn(task=args.task), obs_mean, obs_std)
     dynamics = EnsembleDynamics(
         dynamics_model,
         dynamics_optim,
-        scaler,
+        dynamics_scaler,
         termination_fn,
     )
+
+    policy_scaler = StandardScaler(mu=obs_mean, std=obs_std)
 
     # create policy
     policy = RAMBOPolicy(
@@ -178,6 +180,7 @@ def train(args=get_args()):
         adv_weight=args.adv_weight, 
         adv_rollout_length=args.rollout_length, 
         adv_rollout_batch_size=args.adv_batch_size, 
+        scaler=policy_scaler,
         device=args.device
     ).to(args.device)
 
@@ -206,9 +209,7 @@ def train(args=get_args()):
         step_per_epoch=args.step_per_epoch,
         batch_size=args.batch_size,
         real_ratio=args.real_ratio,
-        eval_episodes=args.eval_episodes,
-        obs_mean=obs_mean, 
-        obs_std=obs_std
+        eval_episodes=args.eval_episodes
     )
 
     # train
@@ -219,7 +220,6 @@ def train(args=get_args()):
         policy.pretrain(real_buffer.sample_all(), args.bc_epoch, args.bc_batch_size, args.bc_lr, logger)
     if args.load_dynamics_path:
         dynamics.load(args.load_dynamics_path)
-        # dynamics.to(args.device)
     else:
         dynamics.train(real_buffer.sample_all(), logger, holdout_ratio=0.15, logvar_loss_coef=0.001)
 
