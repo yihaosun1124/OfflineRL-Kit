@@ -130,7 +130,7 @@ class MOBILEPolicy(BasePolicy):
     @ torch.no_grad()
     def compute_lcb(self, obss: torch.Tensor, actions: torch.Tensor):
         # compute next q std
-        pred_next_obss = self.dynamics.predict_next_obs(obss, actions, self._num_samples)
+        pred_next_obss = self.dynamics.sample_next_obss(obss, actions, self._num_samples)
         num_samples, num_ensembles, batch_size, obs_dim = pred_next_obss.shape
         pred_next_obss = pred_next_obss.reshape(-1, obs_dim)
         pred_next_actions, _ = self.actforward(pred_next_obss)

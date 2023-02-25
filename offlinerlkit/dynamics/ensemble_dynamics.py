@@ -74,38 +74,14 @@ class EnsembleDynamics(BaseDynamics):
         return next_obs, reward, terminal, info
     
     @ torch.no_grad()
-    def compute_model_uncertainty(self, obs: np.ndarray, action: np.ndarray, uncertainty_mode="aleatoric") -> np.ndarray:
-        obs_act = np.concatenate([obs, action], axis=-1)
-        obs_act = self.scaler.transform(obs_act)
-        mean, logvar = self.model(obs_act)
-        mean = mean.cpu().numpy()
-        logvar = logvar.cpu().numpy()
-        mean[..., :-1] += obs
-        std = np.sqrt(np.exp(logvar))
-
-        if uncertainty_mode == "aleatoric":
-            penalty = np.amax(np.linalg.norm(std, axis=2), axis=0)
-        elif uncertainty_mode == "pairwise-diff":
-            next_obses_mean = mean[:, :, :-1]
-            next_obs_mean = np.mean(next_obses_mean, axis=0)
-            diff = next_obses_mean - next_obs_mean
-            penalty = np.amax(np.linalg.norm(diff, axis=2), axis=0)
-        else:
-            raise ValueError
-        
-        penalty = np.expand_dims(penalty, 1).astype(np.float32)
-
-        return self._penalty_coef * penalty
-    
-    @ torch.no_grad()
-    def predict_next_obs(
+    def sample_next_obss(
         self,
         obs: torch.Tensor,
         action: torch.Tensor,
         num_samples: int
     ) -> torch.Tensor:
         obs_act = torch.cat([obs, action], dim=-1)
-        obs_act = self.scaler.transform_tensor(obs_act, device=obs_act.device)
+        obs_act = self.scaler.transform_tensor(obs_act)
         mean, logvar = self.model(obs_act)
         mean[..., :-1] += obs
         std = torch.sqrt(torch.exp(logvar))

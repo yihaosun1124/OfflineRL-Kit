@@ -13,7 +13,7 @@ from offlinerlkit.utils.logger import Logger
 from offlinerlkit.policy import BasePolicy
 
 
-# model-based iql policy trainer
+# model-based policy trainer
 class MBPolicyTrainer:
     def __init__(
         self,
