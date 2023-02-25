@@ -66,6 +66,10 @@ def train(args=get_args()):
     # create env and dataset
     env = gym.make(args.task)
     dataset = qlearning_dataset(env)
+    if 'human' in args.task or 'cloned' in args.task:
+        min, max = dataset["rewards"].min(), dataset["rewards"].max()
+        dataset["rewards"] = (dataset["rewards"] - min) / (max - min)
+
     args.obs_shape = env.observation_space.shape
     args.action_dim = np.prod(env.action_space.shape)
     args.max_action = env.action_space.high[0]
@@ -164,8 +168,6 @@ def train(args=get_args()):
         device=args.device
     )
     real_buffer.load_dataset(dataset)
-    if 'human' in args.task or 'cloned' in args.task:
-        real_buffer.normalize_reward()
 
     fake_buffer = ReplayBuffer(
         buffer_size=args.rollout_batch_size*args.rollout_length*args.model_retain_epochs,
