@@ -27,6 +27,8 @@ class CQLPolicy(SACPolicy):
         alpha: Union[float, Tuple[float, torch.Tensor, torch.optim.Optimizer]] = 0.2,
         cql_weight: float = 1.0,
         temperature: float = 1.0,
+        max_q_backup: bool = False,
+        deterministic_backup: bool = True,
         with_lagrange: bool = True,
         lagrange_threshold: float = 10.0,
         cql_alpha_lr: float = 1e-4,
@@ -47,6 +49,8 @@ class CQLPolicy(SACPolicy):
         self.action_space = action_space
         self._cql_weight = cql_weight
         self._temperature = temperature
+        self._max_q_backup = max_q_backup
+        self._deterministic_backup = deterministic_backup
         self._with_lagrange = with_lagrange
         self._lagrange_threshold = lagrange_threshold
 
@@ -102,13 +106,31 @@ class CQLPolicy(SACPolicy):
             self._alpha = self._log_alpha.detach().exp()
         
         # compute td error
+        if self._max_q_backup:
+            with torch.no_grad():
+                tmp_next_obss = next_obss.unsqueeze(1) \
+                    .repeat(1, self._num_repeat_actions, 1) \
+                    .view(batch_size * self._num_repeat_actions, next_obss.shape[-1])
+                tmp_next_actions, _ = self.actforward(tmp_next_obss)
+                tmp_next_q1 = self.critic1_old(tmp_next_obss, tmp_next_actions) \
+                    .view(batch_size, self._num_repeat_actions, 1) \
+                    .max(1)[0].view(-1, 1)
+                tmp_next_q2 = self.critic2_old(tmp_next_obss, tmp_next_actions) \
+                    .view(batch_size, self._num_repeat_actions, 1) \
+                    .max(1)[0].view(-1, 1)
+                next_q = torch.min(tmp_next_q1, tmp_next_q2)
+        else:
+            with torch.no_grad():
+                next_actions, next_log_probs = self.actforward(next_obss)
+                next_q = torch.min(
+                    self.critic1_old(next_obss, next_actions),
+                    self.critic2_old(next_obss, next_actions)
+                )
+                if not self._deterministic_backup:
+                    next_q -= self._alpha * next_log_probs
+
+        target_q = rewards + self._gamma * (1 - terminals) * next_q
         q1, q2 = self.critic1(obss, actions), self.critic2(obss, actions)
-        with torch.no_grad():
-            next_actions, next_log_probs = self.actforward(next_obss)
-            next_q = torch.min(
-                self.critic1_old(next_obss, next_actions), self.critic2_old(next_obss, next_actions)
-            ) - self._alpha * next_log_probs
-            target_q = rewards + self._gamma * (1 - terminals) * next_q
         critic1_loss = ((q1 - target_q).pow(2)).mean()
         critic2_loss = ((q2 - target_q).pow(2)).mean()
 

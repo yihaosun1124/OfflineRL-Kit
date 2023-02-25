@@ -34,6 +34,8 @@ def get_args():
 
     parser.add_argument("--cql-weight", type=float, default=5.0)
     parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--max-q-backup", type=bool, default=False)
+    parser.add_argument("--deterministic-backup", type=bool, default=True)
     parser.add_argument("--with-lagrange", type=bool, default=False)
     parser.add_argument("--lagrange-threshold", type=float, default=10.0)
     parser.add_argument("--cql-alpha-lr", type=float, default=3e-4)
@@ -110,6 +112,8 @@ def train(args=get_args()):
         alpha=alpha,
         cql_weight=args.cql_weight,
         temperature=args.temperature,
+        max_q_backup=args.max_q_backup,
+        deterministic_backup=args.deterministic_backup,
         with_lagrange=args.with_lagrange,
         lagrange_threshold=args.lagrange_threshold,
         cql_alpha_lr=args.cql_alpha_lr,
