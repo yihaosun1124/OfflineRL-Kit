@@ -92,43 +92,6 @@ class ReplayBuffer:
         self.next_observations = (self.next_observations - mean) / std
         obs_mean, obs_std = mean, std
         return obs_mean, obs_std
-    
-    def normalize_reward(self) -> None:
-        min, max = self.rewards.min(), self.rewards.max()
-        self.rewards = (self.rewards - min) / (max - min)
-    
-    # def normalize_reward(self) -> None:
-    #     terminals_float = np.zeros_like(self.rewards)
-    #     for i in range(len(terminals_float) - 1):
-    #         if np.linalg.norm(self.observations[i + 1] -
-    #                             self.next_observations[i]
-    #                             ) > 1e-6 or self.terminals[i] == 1.0:
-    #             terminals_float[i] = 1
-    #         else:
-    #             terminals_float[i] = 0
-
-    #     terminals_float[-1] = 1
-
-    #     # split_into_trajectories
-    #     trajs = [[]]
-    #     for i in range(len(self.observations)):
-    #         trajs[-1].append((self.observations[i], self.actions[i], self.rewards[i], 1.0-self.terminals[i],
-    #                         terminals_float[i], self.next_observations[i]))
-    #         if terminals_float[i] == 1.0 and i + 1 < len(self.observations):
-    #             trajs.append([])
-        
-    #     def compute_returns(traj):
-    #         episode_return = 0
-    #         for _, _, rew, _, _, _ in traj:
-    #             episode_return += rew
-
-    #         return episode_return
-
-    #     trajs.sort(key=compute_returns)
-
-    #     # normalize rewards
-    #     self.rewards /= compute_returns(trajs[-1]) - compute_returns(trajs[0])
-    #     self.rewards *= 1000.0
 
     def sample(self, batch_size: int) -> Dict[str, torch.Tensor]:
 

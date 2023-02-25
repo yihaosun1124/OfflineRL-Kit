@@ -41,12 +41,50 @@ def get_args():
     return parser.parse_args()
 
 
+def normalize_rewards(dataset):
+    terminals_float = np.zeros_like(dataset["rewards"])
+    for i in range(len(terminals_float) - 1):
+        if np.linalg.norm(dataset["observations"][i + 1] -
+                            dataset["next_observations"][i]
+                            ) > 1e-6 or dataset["terminals"][i] == 1.0:
+            terminals_float[i] = 1
+        else:
+            terminals_float[i] = 0
+
+    terminals_float[-1] = 1
+
+    # split_into_trajectories
+    trajs = [[]]
+    for i in range(len(dataset["observations"])):
+        trajs[-1].append((dataset["observations"][i], dataset["actions"][i], dataset["rewards"][i], 1.0-dataset["terminals"][i],
+                        terminals_float[i], dataset["next_observations"][i]))
+        if terminals_float[i] == 1.0 and i + 1 < len(dataset["observations"]):
+            trajs.append([])
+    
+    def compute_returns(traj):
+        episode_return = 0
+        for _, _, rew, _, _, _ in traj:
+            episode_return += rew
+
+        return episode_return
+
+    trajs.sort(key=compute_returns)
+
+    # normalize rewards
+    dataset["rewards"] /= compute_returns(trajs[-1]) - compute_returns(trajs[0])
+    dataset["rewards"] *= 1000.0
+
+    return dataset
+
+
 def train(args=get_args()):
     # create env and dataset
     env = gym.make(args.task)
     dataset = qlearning_dataset(env)
     if 'antmaze' in args.task:
         dataset["rewards"] -= 1.0
+    if ("halfcheetah" in args.task or "walker2d" in args.task or "hopper" in args.task):
+        dataset = normalize_rewards(dataset)
     args.obs_shape = env.observation_space.shape
     args.action_dim = np.prod(env.action_space.shape)
     args.max_action = env.action_space.high[0]
@@ -118,8 +156,6 @@ def train(args=get_args()):
         device=args.device
     )
     buffer.load_dataset(dataset)
-    if ("halfcheetah" in args.task or "walker2d" in args.task or "hopper" in args.task):
-        buffer.normalize_reward()
 
     # log
     log_dirs = make_log_dirs(args.task, args.algo_name, args.seed, vars(args))
