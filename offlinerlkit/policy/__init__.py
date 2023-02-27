@@ -7,6 +7,7 @@ from offlinerlkit.policy.model_free.cql import CQLPolicy
 from offlinerlkit.policy.model_free.iql import IQLPolicy
 from offlinerlkit.policy.model_free.mcq import MCQPolicy
 from offlinerlkit.policy.model_free.td3bc import TD3BCPolicy
+from offlinerlkit.policy.model_free.edac import EDACPolicy
 
 # model based
 from offlinerlkit.policy.model_based.mopo import MOPOPolicy
@@ -22,6 +23,7 @@ __all__ = [
     "IQLPolicy",
     "MCQPolicy",
     "TD3BCPolicy",
+    "EDACPolicy",
     "MOPOPolicy",
     "MOBILEPolicy",
     "RAMBOPolicy"
