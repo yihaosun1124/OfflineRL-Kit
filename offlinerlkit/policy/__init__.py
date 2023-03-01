@@ -13,6 +13,7 @@ from offlinerlkit.policy.model_free.edac import EDACPolicy
 from offlinerlkit.policy.model_based.mopo import MOPOPolicy
 from offlinerlkit.policy.model_based.mobile import MOBILEPolicy
 from offlinerlkit.policy.model_based.rambo import RAMBOPolicy
+from offlinerlkit.policy.model_based.combo import COMBOPolicy
 
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "EDACPolicy",
     "MOPOPolicy",
     "MOBILEPolicy",
-    "RAMBOPolicy"
+    "RAMBOPolicy",
+    "COMBOPolicy"
 ]
