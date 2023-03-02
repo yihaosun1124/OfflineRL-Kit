@@ -73,8 +73,6 @@ def run_exp(config):
     # create env and dataset
     env = gym.make(args_for_exp.task)
     dataset = qlearning_dataset(env)
-    if 'antmaze' in args_for_exp.task:
-        dataset["rewards"] -= 1.0
     args_for_exp.obs_shape = env.observation_space.shape
     args_for_exp.action_dim = np.prod(env.action_space.shape)
     args_for_exp.max_action = env.action_space.high[0]
@@ -124,7 +122,6 @@ def run_exp(config):
         num_ensemble=args_for_exp.n_ensemble,
         num_elites=args_for_exp.n_elites,
         weight_decays=args_for_exp.dynamics_weight_decay,
-        load_model=load_dynamics_model,
         device=args_for_exp.device
     )
     dynamics_optim = torch.optim.Adam(
@@ -222,8 +219,6 @@ def run_exp(config):
 
 
 if __name__ == "__main__":
-    os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
-
     ray.init()
     # load default args
     args = get_args()
