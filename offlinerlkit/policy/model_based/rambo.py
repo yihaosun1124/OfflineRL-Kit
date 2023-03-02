@@ -35,7 +35,7 @@ class RAMBOPolicy(MOPOPolicy):
         adv_train_steps: int = 1000,
         adv_rollout_batch_size: int = 256,
         adv_rollout_length: int = 5,
-        include_ent_in_adv: bool = False, # 这里是不是False,
+        include_ent_in_adv: bool = False,
         scaler: StandardScaler = None,
         device="cpu"
     ) -> None:
@@ -140,8 +140,10 @@ class RAMBOPolicy(MOPOPolicy):
     ):
         obs_act = np.concatenate([observations, actions], axis=-1)
         obs_act = self.dynamics.scaler.transform(obs_act)
-        mean, logvar = self.dynamics.model(obs_act)
-        mean[..., :-1] += torch.from_numpy(observations).to(mean.device)
+        diff_mean, logvar = self.dynamics.model(obs_act)
+        observations = torch.from_numpy(observations).to(diff_mean.device)
+        diff_obs, diff_reward = torch.split(diff_mean, [diff_mean.shape[-1]-1, 1], dim=-1)
+        mean = torch.cat([diff_obs + observations, diff_reward], dim=-1)
         std = torch.sqrt(torch.exp(logvar))
         
         dist = torch.distributions.Normal(mean, std)
