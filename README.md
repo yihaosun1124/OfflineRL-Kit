@@ -1,3 +1,9 @@
+<div align="center">
+  <img width="500px" height="auto" src="assets/logo.png">
+</div>
+
+---
+
 # OfflineRL-Kit: An elegant PyTorch offline reinforcement learning library.
 
 ![MIT](https://img.shields.io/badge/license-MIT-blue)
@@ -84,6 +90,8 @@ policy = CQLPolicy(
     alpha=alpha,
     cql_weight=args.cql_weight,
     temperature=args.temperature,
+    max_q_backup=args.max_q_backup,
+    deterministic_backup=args.deterministic_backup,
     with_lagrange=args.with_lagrange,
     lagrange_threshold=args.lagrange_threshold,
     cql_alpha_lr=args.cql_alpha_lr,
