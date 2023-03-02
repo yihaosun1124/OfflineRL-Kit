@@ -22,11 +22,26 @@ from offlinerlkit.policy_trainer import MBPolicyTrainer
 from offlinerlkit.policy import MOPOPolicy
 
 
+"""
+suggested hypers
+
+halfcheetah-medium-v2: rollout-length=5, penalty-coef=0.5
+hopper-medium-v2: rollout-length=5, penalty-coef=5.0
+walker2d-medium-v2: rollout-length=5, penalty-coef=0.5
+halfcheetah-medium-replay-v2: rollout-length=5, penalty-coef=0.5
+hopper-medium-replay-v2: rollout-length=5, penalty-coef=2.5
+walker2d-medium-replay-v2: rollout-length=1, penalty-coef=2.5
+halfcheetah-medium-expert-v2: rollout-length=5, penalty-coef=2.5
+hopper-medium-expert-v2: rollout-length=5, penalty-coef=5.0
+walker2d-medium-expert-v2: rollout-length=1, penalty-coef=2.5
+"""
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="mopo")
-    parser.add_argument("--task", type=str, default="walker2d-medium-v2")
-    parser.add_argument("--seed", type=int, default=2)
+    parser.add_argument("--task", type=str, default="walker2d-medium-expert-v2")
+    parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--actor-lr", type=float, default=1e-4)
     parser.add_argument("--critic-lr", type=float, default=3e-4)
     parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256])
@@ -44,8 +59,8 @@ def get_args():
     parser.add_argument("--n-elites", type=int, default=5)
     parser.add_argument("--rollout-freq", type=int, default=1000)
     parser.add_argument("--rollout-batch-size", type=int, default=50000)
-    parser.add_argument("--rollout-length", type=int, default=5)
-    parser.add_argument("--penalty-coef", type=float, default=0.5)
+    parser.add_argument("--rollout-length", type=int, default=1)
+    parser.add_argument("--penalty-coef", type=float, default=2.5)
     parser.add_argument("--model-retain-epochs", type=int, default=5)
     parser.add_argument("--real-ratio", type=float, default=0.05)
     parser.add_argument("--load-dynamics-path", type=str, default=None)
