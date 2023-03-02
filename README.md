@@ -21,6 +21,7 @@ OfflineRL-Kit is an offline reinforcement learning library based on pure PyTorch
     - [Conservative Q-Learning (CQL)](https://arxiv.org/abs/2006.04779)
     - [TD3+BC](https://arxiv.org/abs/2106.06860)
     - [Implicit Q-Learning (IQL)](https://arxiv.org/abs/2110.06169)
+    - [Ensemble-Diversified Actor Critic (EDAC)](https://arxiv.org/abs/2110.01548)
     - [Mildly Conservative Q-Learning (MCQ)](https://arxiv.org/abs/2206.04745)
 - Model-based
     - [Model-based Offline Policy Optimization (MOPO)](https://arxiv.org/abs/2005.13239)
