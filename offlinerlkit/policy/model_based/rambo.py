@@ -90,9 +90,6 @@ class RAMBOPolicy(MOPOPolicy):
                 self._bc_optim.step()
                 sum_loss += bc_loss.cpu().item()
             print(f"Epoch {i_epoch}, mean bc loss {sum_loss/i_batch}")
-            # logger.logkv("loss/pretrain_bc", sum_loss/i_batch)
-            # logger.set_timestep(i_epoch)
-            # logger.dumpkvs(exclude)
         torch.save(self.state_dict(), os.path.join(logger.model_dir, "rambo_pretrain.pth"))
 
     def update_dynamics(
@@ -106,7 +103,7 @@ class RAMBOPolicy(MOPOPolicy):
             "adv_dynamics_update/adv_advantage": 0, 
             "adv_dynamics_update/adv_log_prob": 0, 
         }
-        # self.dynamics.train()
+        self.dynamics.model.train()
         steps = 0
         while steps < self._adv_train_steps:
             init_obss = real_buffer.sample(self._adv_rollout_batch_size)["observations"].cpu().numpy()
@@ -126,7 +123,7 @@ class RAMBOPolicy(MOPOPolicy):
                     # break
                 if steps == 1000:
                     break
-        # self.dynamics.eval()
+        self.dynamics.model.eval()
         return {_key: _value/steps for _key, _value in all_loss_info.items()}
 
     def dynamics_step_and_forward(
@@ -155,12 +152,12 @@ class RAMBOPolicy(MOPOPolicy):
         sample = ensemble_sample[selected_indexes, np.arange(batch_size)]
         next_observations = sample[..., :-1]
         rewards = sample[..., -1:]
-        terminals = np.squeeze(self.dynamics.terminal_fn(observations.detach().cpu().numpy(), actions, next_observations.detach().cpu().numpy()))
+        terminals = self.dynamics.terminal_fn(observations.detach().cpu().numpy(), actions, next_observations.detach().cpu().numpy())
 
         # compute logprob
         log_prob = dist.log_prob(sample)
         log_prob = log_prob[self.dynamics.model.elites.data, ...]
-        log_prob = log_prob.exp().mean(dim=0).log().sum(-1)
+        log_prob = log_prob.exp().mean(dim=0).log().sum(-1, keepdim=True)
 
         # compute the advantage
         with torch.no_grad():
@@ -171,7 +168,8 @@ class RAMBOPolicy(MOPOPolicy):
             )
             if self._include_ent_in_adv:
                 next_q = next_q - self._alpha * next_policy_log_prob
-            value = rewards + (1-torch.from_numpy(terminals).to(mean.device).float().unsqueeze(1)) * self._gamma * next_q
+
+            value = rewards + (1-torch.from_numpy(terminals).to(mean.device).float()) * self._gamma * next_q
 
             value_baseline = torch.minimum(
                 self.critic1(observations, actions), 
@@ -179,7 +177,7 @@ class RAMBOPolicy(MOPOPolicy):
             )
             advantage = value - value_baseline
             advantage = (advantage - advantage.mean()) / (advantage.std()+1e-6)
-        adv_loss = (log_prob * advantage).sum()
+        adv_loss = (log_prob * advantage).mean()
 
         # compute the supervised loss
         sl_input = torch.cat([sl_observations, sl_actions], dim=-1).cpu().numpy()

@@ -29,13 +29,13 @@ def get_args():
     parser.add_argument("--critic-lr", type=float, default=3e-4)
     parser.add_argument("--dynamics-lr", type=float, default=3e-4)
     parser.add_argument("--dynamics-adv-lr", type=float, default=3e-4)
-    parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256])
+    parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256, 256])
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.005)
     parser.add_argument("--alpha", type=float, default=0.2)
     parser.add_argument("--auto-alpha", default=True)
-    parser.add_argument("--target-entropy", type=int, default=-3)
-    parser.add_argument("--alpha-lr", type=float, default=3e-4)
+    parser.add_argument("--target-entropy", type=int, default=None)
+    parser.add_argument("--alpha-lr", type=float, default=1e-4)
 
     parser.add_argument("--dynamics-hidden-dims", type=int, nargs='*', default=[200, 200, 200, 200])
     parser.add_argument("--dynamics-weight-decay", type=float, nargs='*', default=[2.5e-5, 5e-5, 7.5e-5, 7.5e-5, 1e-4])
@@ -46,7 +46,7 @@ def get_args():
     parser.add_argument("--adv-batch-size", type=int, default=256)
     parser.add_argument("--rollout-batch-size", type=int, default=50000)
     parser.add_argument("--rollout-length", type=int, default=5)
-    parser.add_argument("--adv-weight", type=float, default=0)
+    parser.add_argument("--adv-weight", type=float, default=3e-4)
     parser.add_argument("--model-retain-epochs", type=int, default=5)
     parser.add_argument("--real-ratio", type=float, default=0.5)
     parser.add_argument("--load-dynamics-path", type=str, default=None)
@@ -57,8 +57,7 @@ def get_args():
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
 
-    parser.add_argument("--include-ent-in-adv", type=int, default=0)
-    parser.add_argument("--do-bc", type=int, default=1)
+    parser.add_argument("--include-ent-in-adv", type=bool, default=False)
     parser.add_argument("--load-bc-path", type=str, default=None)
     parser.add_argument("--bc-lr", type=float, default=1e-4)
     parser.add_argument("--bc-epoch", type=int, default=50)
@@ -177,7 +176,8 @@ def train(args=get_args()):
         alpha=alpha, 
         adv_weight=args.adv_weight, 
         adv_rollout_length=args.rollout_length, 
-        adv_rollout_batch_size=args.adv_batch_size, 
+        adv_rollout_batch_size=args.adv_batch_size,
+        include_ent_in_adv=args.include_ent_in_adv,
         scaler=policy_scaler,
         device=args.device
     ).to(args.device)
@@ -219,7 +219,7 @@ def train(args=get_args()):
     if args.load_dynamics_path:
         dynamics.load(args.load_dynamics_path)
     else:
-        dynamics.train(real_buffer.sample_all(), logger, holdout_ratio=0.15, logvar_loss_coef=0.001)
+        dynamics.train(real_buffer.sample_all(), logger, holdout_ratio=0.1, logvar_loss_coef=0.001)
 
     policy_trainer.train()
 
