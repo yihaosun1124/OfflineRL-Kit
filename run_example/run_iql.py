@@ -16,6 +16,11 @@ from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MFPolicyTrainer
 from offlinerlkit.policy import IQLPolicy
 
+"""
+suggested hypers
+expectile=0.7, temperature=3.0 for all D4RL-Gym tasks
+"""
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -27,7 +32,7 @@ def get_args():
     parser.add_argument("--critic-q-lr", type=float, default=3e-4)
     parser.add_argument("--critic-v-lr", type=float, default=3e-4)
     parser.add_argument("--dropout_rate", type=float, default=None)
-    parser.add_argument("--lr-decay", type=bool, default=False)
+    parser.add_argument("--lr-decay", type=bool, default=True)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.005)
     parser.add_argument("--expectile", type=float, default=0.7)

@@ -17,6 +17,21 @@ from offlinerlkit.policy_trainer import MFPolicyTrainer
 from offlinerlkit.policy import EDACPolicy
 
 
+"""
+suggested hypers
+
+halfcheetah-medium-v2: num-critics=10, eta=1.0
+hopper-medium-v2: num-critics=50, eta=1.0
+walker2d-medium-v2: num-critics=10, eta=1.0
+halfcheetah-medium-replay-v2: num-critics=10, eta=1.0
+hopper-medium-replay-v2: num-critics=50, eta=1.0
+walker2d-medium-replay-v2: num-critics=10, eta=1.0
+halfcheetah-medium-expert-v2: num-critics=10, eta=5.0
+hopper-medium-expert-v2: num-critics=50, eta=1.0
+walker2d-medium-expert-v2: num-critics=10, eta=5.0
+"""
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="edac")

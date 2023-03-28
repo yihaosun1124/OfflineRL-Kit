@@ -19,6 +19,12 @@ from offlinerlkit.policy_trainer import MFPolicyTrainer
 from offlinerlkit.policy import TD3BCPolicy
 
 
+"""
+suggested hypers
+alpha=2.5 for all D4RL-Gym tasks
+"""
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="td3bc")
