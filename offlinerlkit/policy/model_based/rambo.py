@@ -82,8 +82,8 @@ class RAMBOPolicy(MOPOPolicy):
                 batch_obs = torch.from_numpy(batch_obs).to(self.device)
                 batch_act = torch.from_numpy(batch_act).to(self.device)
                 dist = self.actor(batch_obs)
-                log_prob = dist.log_prob(batch_act)
-                bc_loss = - log_prob.mean()
+                pred_actions, _ = dist.rsample()
+                bc_loss = ((pred_actions - batch_act) ** 2).mean()
 
                 self._bc_optim.zero_grad()
                 bc_loss.backward()
@@ -109,7 +109,7 @@ class RAMBOPolicy(MOPOPolicy):
             init_obss = real_buffer.sample(self._adv_rollout_batch_size)["observations"].cpu().numpy()
             observations = init_obss
             for t in range(self._adv_rollout_length):
-                actions = self.select_action(observations)
+                actions = super().select_action(observations)
                 sl_observations, sl_actions, sl_next_observations, sl_rewards = \
                     itemgetter("observations", "actions", "next_observations", "rewards")(real_buffer.sample(self._adv_rollout_batch_size))
                 next_observations, terminals, loss_info = self.dynamics_step_and_forward(observations, actions, sl_observations, sl_actions, sl_next_observations, sl_rewards)
@@ -155,9 +155,11 @@ class RAMBOPolicy(MOPOPolicy):
         terminals = self.dynamics.terminal_fn(observations.detach().cpu().numpy(), actions, next_observations.detach().cpu().numpy())
 
         # compute logprob
-        log_prob = dist.log_prob(sample)
+        log_prob = dist.log_prob(sample).sum(-1, keepdim=True)
         log_prob = log_prob[self.dynamics.model.elites.data, ...]
-        log_prob = log_prob.exp().mean(dim=0).log().sum(-1, keepdim=True)
+        prob = log_prob.exp()
+        prob = prob * (1/len(self.dynamics.model.elites.data))
+        log_prob = prob.sum(0).log()
 
         # compute the advantage
         with torch.no_grad():
@@ -203,6 +205,42 @@ class RAMBOPolicy(MOPOPolicy):
             "adv_dynamics_update/adv_advantage": advantage.mean().cpu().item(), 
             "adv_dynamics_update/adv_log_prob": log_prob.mean().cpu().item(), 
         }
+
+    def rollout(
+        self,
+        init_obss: np.ndarray,
+        rollout_length: int
+    ) -> Tuple[Dict[str, np.ndarray], Dict]:
+
+        num_transitions = 0
+        rewards_arr = np.array([])
+        rollout_transitions = defaultdict(list)
+
+        # rollout
+        observations = init_obss
+        for _ in range(rollout_length):
+            actions = super().select_action(observations)
+            next_observations, rewards, terminals, info = self.dynamics.step(observations, actions)
+            rollout_transitions["obss"].append(observations)
+            rollout_transitions["next_obss"].append(next_observations)
+            rollout_transitions["actions"].append(actions)
+            rollout_transitions["rewards"].append(rewards)
+            rollout_transitions["terminals"].append(terminals)
+
+            num_transitions += len(observations)
+            rewards_arr = np.append(rewards_arr, rewards.flatten())
+
+            nonterm_mask = (~terminals).flatten()
+            if nonterm_mask.sum() == 0:
+                break
+
+            observations = next_observations[nonterm_mask]
+        
+        for k, v in rollout_transitions.items():
+            rollout_transitions[k] = np.concatenate(v, axis=0)
+
+        return rollout_transitions, \
+            {"num_transitions": num_transitions, "reward_mean": rewards_arr.mean()}
 
     def select_action(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
         if self.scaler is not None:

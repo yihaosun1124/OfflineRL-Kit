@@ -13,7 +13,6 @@ from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDy
 from offlinerlkit.dynamics import EnsembleDynamics
 from offlinerlkit.utils.scaler import StandardScaler
 from offlinerlkit.utils.termination_fns import get_termination_fn, obs_unnormalization
-from offlinerlkit.utils.load_dataset import qlearning_dataset
 from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MBPolicyTrainer
@@ -29,7 +28,7 @@ def get_args():
     parser.add_argument("--critic-lr", type=float, default=3e-4)
     parser.add_argument("--dynamics-lr", type=float, default=3e-4)
     parser.add_argument("--dynamics-adv-lr", type=float, default=3e-4)
-    parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256, 256])
+    parser.add_argument("--hidden-dims", type=int, nargs='*', default=[256, 256])
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.005)
     parser.add_argument("--alpha", type=float, default=0.2)
@@ -69,7 +68,7 @@ def get_args():
 def train(args=get_args()):
     # create env and dataset
     env = gym.make(args.task)
-    dataset = qlearning_dataset(env)
+    dataset = d4rl.qlearning_dataset(env)
     args.obs_shape = env.observation_space.shape
     args.action_dim = np.prod(env.action_space.shape)
     args.max_action = env.action_space.high[0]
@@ -219,7 +218,13 @@ def train(args=get_args()):
     if args.load_dynamics_path:
         dynamics.load(args.load_dynamics_path)
     else:
-        dynamics.train(real_buffer.sample_all(), logger, holdout_ratio=0.1, logvar_loss_coef=0.001)
+        dynamics.train(
+            real_buffer.sample_all(),
+            logger,
+            holdout_ratio=0.1,
+            logvar_loss_coef=0.001,
+            max_epochs_since_update=10
+        )
 
     policy_trainer.train()
 
