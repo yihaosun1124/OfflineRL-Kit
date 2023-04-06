@@ -118,7 +118,7 @@ class RAMBOPolicy(MOPOPolicy):
                 # nonterm_mask = (~terminals).flatten()
                 steps += 1
                 # observations = next_observations[nonterm_mask]
-                observations = next_observations
+                observations = next_observations.copy()
                 # if nonterm_mask.sum() == 0:
                     # break
                 if steps == 1000:
@@ -157,9 +157,9 @@ class RAMBOPolicy(MOPOPolicy):
         # compute logprob
         log_prob = dist.log_prob(sample).sum(-1, keepdim=True)
         log_prob = log_prob[self.dynamics.model.elites.data, ...]
-        prob = log_prob.exp()
+        prob = log_prob.double().exp()
         prob = prob * (1/len(self.dynamics.model.elites.data))
-        log_prob = prob.sum(0).log()
+        log_prob = prob.sum(0).log().type(torch.float32)
 
         # compute the advantage
         with torch.no_grad():
