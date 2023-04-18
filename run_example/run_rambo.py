@@ -19,6 +19,21 @@ from offlinerlkit.policy_trainer import MBPolicyTrainer
 from offlinerlkit.policy import RAMBOPolicy
 
 
+"""
+suggested hypers
+
+halfcheetah-medium-v2: rollout-length=5, adv-weight=3e-4
+hopper-medium-v2: rollout-length=5, adv-weight=3e-4
+walker2d-medium-v2: rollout-length=5, adv-weight=0
+halfcheetah-medium-replay-v2: rollout-length=5, adv-weight=3e-4
+hopper-medium-replay-v2: rollout-length=5, adv-weight=3e-4
+walker2d-medium-replay-v2: rollout-length=5, adv-weight=0
+halfcheetah-medium-expert-v2: rollout-length=5, adv-weight=0
+hopper-medium-expert-v2: rollout-length=5, adv-weight=0
+walker2d-medium-expert-v2: rollout-length=2, adv-weight=3e-4
+"""
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="rambo")
