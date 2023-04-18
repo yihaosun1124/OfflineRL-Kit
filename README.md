@@ -30,17 +30,17 @@ OfflineRL-Kit is an offline reinforcement learning library based on pure PyTorch
 
 ## Benchmark Results (3 seeds) (Ongoing)
 
-|                              | CQL       | TD3+BC    | EDAC      | IQL       | MOPO      |
-| ---------------------------- | --------- | --------- | --------- | --------- | --------- |
-| halfcheetah-medium-v2        | 49.3±0.1  | 48.5±0.4  | 66.3±1.2  | 47.4±0.6  | 72.4±4.2  |
-| hopper-medium-v2             | 57.9±4.1  | 62.6±1.7  | 101.8±0.2 | 69.2±6.2  | 62.8±38.1 |
-| walker2d-medium-v2           | 83.4±0.4  | 84.3±2.4  | 93.6±0.8  | 80.8±3.0  | 84.1±3.2  |
-| halfcheetah-medium-replay-v2 | 47.0±0.4  | 44.9±0.5  | 61.8±1.3  | 44.3±0.7  | 72.1±3.8  |
-| hopper-medium-replay-v2      | 97.9±1.0  | 73.8±8.0  | 101.5±0.2 | 92.5±6.1  | 92.7±20.7 |
-| walker2d-medium-replay-v2    | 81.4±4.4  | 87.3±2.1  | 86.0±1.4  | 83.4±2.9  | 85.9±5.3  |
-| halfcheetah-medium-expert-v2 | 93.5±2.2  | 91.2±3.0  | 100.3±9.2 | 86.6±1.5  | 83.6±12.5 |
-| hopper-medium-expert-v2      | 111.2±0.2 | 90.9±13.0 | 110.5±0.2 | 108.9±3.4 | 74.6±44.2 |
-| walker2d-medium-expert-v2    | 109.9±0.5 | 110.2±0.3 | 113.5±0.2 | 107.5±2.5 | 108.2±4.3 |
+|                              | CQL       | TD3+BC    | EDAC      | IQL       | MOPO      | RAMBO     |
+| ---------------------------- | --------- | --------- | --------- | --------- | --------- | --------- |
+| halfcheetah-medium-v2        | 49.3±0.1  | 48.5±0.4  | 66.3±1.2  | 47.4±0.6  | 72.4±4.2  | 78.7±1.2  |
+| hopper-medium-v2             | 57.9±4.1  | 62.6±1.7  | 101.8±0.2 | 69.2±6.2  | 62.8±38.1 | 75.6±41.9 |
+| walker2d-medium-v2           | 83.4±0.4  | 84.3±2.4  | 93.6±0.8  | 80.8±3.0  | 84.1±3.2  | 86.0±1.2  |
+| halfcheetah-medium-replay-v2 | 47.0±0.4  | 44.9±0.5  | 61.8±1.3  | 44.3±0.7  | 72.1±3.8  | 67.2±3.3  |
+| hopper-medium-replay-v2      | 97.9±1.0  | 73.8±8.0  | 101.5±0.2 | 92.5±6.1  | 92.7±20.7 | 99.7±3.3  |
+| walker2d-medium-replay-v2    | 81.4±4.4  | 87.3±2.1  | 86.0±1.4  | 83.4±2.9  | 85.9±5.3  | 72.2±6.8  |
+| halfcheetah-medium-expert-v2 | 93.5±2.2  | 91.2±3.0  | 100.3±9.2 | 86.6±1.5  | 83.6±12.5 | 98.7±5.0  |
+| hopper-medium-expert-v2      | 111.2±0.2 | 90.9±13.0 | 110.5±0.2 | 108.9±3.4 | 74.6±44.2 | 80.3±34.2 |
+| walker2d-medium-expert-v2    | 109.9±0.5 | 110.2±0.3 | 113.5±0.2 | 107.5±2.5 | 108.2±4.3 | 104.3±8.5 |
 
 Detailed logs can be viewed in <https://drive.google.com/drive/folders/11QHHDlLmUEc097tPgYvb4gZ2IaqSpkHp?usp=share_link>.
 
