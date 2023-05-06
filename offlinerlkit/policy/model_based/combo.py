@@ -190,6 +190,9 @@ class COMBOPolicy(CQLPolicy):
         # cat_q shape: (batch_size, 3 * num_repeat, 1)
         cat_q1 = torch.cat([obs_pi_value1, next_obs_pi_value1, random_value1], 1)
         cat_q2 = torch.cat([obs_pi_value2, next_obs_pi_value2, random_value2], 1)
+        # Samples from the original dataset
+        real_obss, real_actions = real_batch['observations'], real_batch['actions']
+        q1, q2 = self.critic1(real_obss, real_actions), self.critic2(real_obss, real_actions)
 
         conservative_loss1 = \
             torch.logsumexp(cat_q1 / self._temperature, dim=1).mean() * self._cql_weight * self._temperature - \
