@@ -22,6 +22,21 @@ from offlinerlkit.policy_trainer import MBPolicyTrainer
 from offlinerlkit.policy import COMBOPolicy
 
 
+"""
+suggested hypers
+
+halfcheetah-medium-v2: rollout-length=5, cql-weight=0.5
+hopper-medium-v2: rollout-length=5, cql-weight=5.0
+walker2d-medium-v2: rollout-length=1, cql-weight=5.0
+halfcheetah-medium-replay-v2: rollout-length=5, cql-weight=0.5
+hopper-medium-replay-v2: rollout-length=5, cql-weight=0.5
+walker2d-medium-replay-v2: rollout-length=1, cql-weight=0.5
+halfcheetah-medium-expert-v2: rollout-length=5, cql-weight=5.0
+hopper-medium-expert-v2: rollout-length=5, cql-weight=5.0
+walker2d-medium-expert-v2: rollout-length=1, cql-weight=5.0
+"""
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="combo")
@@ -45,8 +60,8 @@ def get_args():
     parser.add_argument("--lagrange-threshold", type=float, default=10.0)
     parser.add_argument("--cql-alpha-lr", type=float, default=3e-4)
     parser.add_argument("--num-repeat-actions", type=int, default=10)
-    parser.add_argument("--uniform-rollout", type=bool, default=True)
-    parser.add_argument("--rho-s", type=str, default="model", choices=["model", "mix"])
+    parser.add_argument("--uniform-rollout", type=bool, default=False)
+    parser.add_argument("--rho-s", type=str, default="mix", choices=["model", "mix"])
 
     parser.add_argument("--dynamics-lr", type=float, default=1e-3)
     parser.add_argument("--dynamics-hidden-dims", type=int, nargs='*', default=[200, 200, 200, 200])
