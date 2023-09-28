@@ -62,7 +62,7 @@ def train(args=get_args()):
     dataset = qlearning_dataset(env)
     # See https://github.com/aviralkumar2907/CQL/blob/master/d4rl/examples/cql_antmaze_new.py#L22
     if 'antmaze' in args.task:
-        dataset.rewards = (dataset.rewards - 0.5) * 4.0
+        dataset["rewards"] = (dataset["rewards"] - 0.5) * 4.0
     args.obs_shape = env.observation_space.shape
     args.action_dim = np.prod(env.action_space.shape)
     args.max_action = env.action_space.high[0]
