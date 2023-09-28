@@ -28,7 +28,8 @@ class MOBILEPolicy(BasePolicy):
         alpha: Union[float, Tuple[float, torch.Tensor, torch.optim.Optimizer]] = 0.2,
         penalty_coef: float = 1.0,
         num_samples: int = 10,
-        deterministic_backup: bool = False
+        deterministic_backup: bool = False,
+        max_q_backup: bool = False
     ) -> None:
 
         super().__init__()
@@ -55,6 +56,7 @@ class MOBILEPolicy(BasePolicy):
         self._penalty_coef = penalty_coef
         self._num_samples = num_samples
         self._deteterministic_backup = deterministic_backup
+        self._max_q_backup = max_q_backup
 
     def train(self) -> None:
         self.actor.train()
@@ -130,7 +132,7 @@ class MOBILEPolicy(BasePolicy):
     @ torch.no_grad()
     def compute_lcb(self, obss: torch.Tensor, actions: torch.Tensor):
         # compute next q std
-        pred_next_obss = self.dynamics.sample_next_obss(obss, actions, self._num_samples)
+        pred_next_obss = self.dynamics.predict_next_obs(obss, actions, self._num_samples)
         num_samples, num_ensembles, batch_size, obs_dim = pred_next_obss.shape
         pred_next_obss = pred_next_obss.reshape(-1, obs_dim)
         pred_next_actions, _ = self.actforward(pred_next_obss)
@@ -146,6 +148,7 @@ class MOBILEPolicy(BasePolicy):
         mix_batch = {k: torch.cat([real_batch[k], fake_batch[k]], 0) for k in real_batch.keys()}
         
         obss, actions, next_obss, rewards, terminals = mix_batch["observations"], mix_batch["actions"], mix_batch["next_observations"], mix_batch["rewards"], mix_batch["terminals"]
+        batch_size = obss.shape[0]
 
         # update critic
         qs = torch.stack([critic(obss, actions) for critic in self.critics], 0)
@@ -153,11 +156,20 @@ class MOBILEPolicy(BasePolicy):
             penalty = self.compute_lcb(obss, actions)
             penalty[:len(real_batch["rewards"])] = 0.0
 
-            next_actions, next_log_probs = self.actforward(next_obss)
-            next_qs = torch.cat([critic_old(next_obss, next_actions) for critic_old in self.critics_old], 1)
-            next_q = torch.min(next_qs, 1)[0].reshape(-1, 1)
-            if not self._deteterministic_backup:
-                next_q -= self._alpha * next_log_probs
+            if self._max_q_backup:
+                tmp_next_obss = next_obss.unsqueeze(1) \
+                    .repeat(1, 10, 1) \
+                    .view(batch_size * 10, next_obss.shape[-1])
+                tmp_next_actions, _ = self.actforward(tmp_next_obss)
+                tmp_next_qs = torch.cat([critic_old(tmp_next_obss, tmp_next_actions) for critic_old in self.critics_old], 1)
+                tmp_next_qs = tmp_next_qs.view(batch_size, 10, len(self.critics_old)).max(1)[0].view(-1, len(self.critics_old))
+                next_q = torch.min(tmp_next_qs, 1)[0].reshape(-1, 1)
+            else:
+                next_actions, next_log_probs = self.actforward(next_obss)
+                next_qs = torch.cat([critic_old(next_obss, next_actions) for critic_old in self.critics_old], 1)
+                next_q = torch.min(next_qs, 1)[0].reshape(-1, 1)
+                if not self._deteterministic_backup:
+                    next_q -= self._alpha * next_log_probs
             target_q = (rewards - self._penalty_coef * penalty) + self._gamma * (1 - terminals) * next_q
             target_q = torch.clamp(target_q, 0, None)
 

@@ -10,7 +10,7 @@ import torch
 
 from offlinerlkit.nets import MLP
 from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian, EnsembleDynamicsModel
-from offlinerlkit.dynamics import EnsembleDynamics, MujocoOracleDynamics
+from offlinerlkit.dynamics import EnsembleDynamics
 from offlinerlkit.utils.scaler import StandardScaler
 from offlinerlkit.utils.termination_fns import get_termination_fn
 from offlinerlkit.utils.load_dataset import qlearning_dataset
@@ -18,6 +18,11 @@ from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MBPolicyTrainer
 from offlinerlkit.policy import MOBILEPolicy
+
+
+"""
+suggested hypers can been seen in "https://github.com/yihaosun1124/mobile/tree/main/configs"
+"""
 
 
 def get_args():
@@ -36,9 +41,13 @@ def get_args():
     parser.add_argument("--alpha-lr", type=float, default=1e-4)
 
     parser.add_argument("--num-q-ensemble", type=int, default=2)
+    parser.add_argument("--deterministic-backup", type=bool, default=False)
+    parser.add_argument("--max-q-backup", type=bool, default=False)
+    parser.add_argument("--norm-reward", type=bool, default=False)
 
     parser.add_argument("--dynamics-lr", type=float, default=1e-3)
     parser.add_argument("--max-epochs-since-update", type=int, default=5)
+    parser.add_argument("--dynamics-max-epochs", type=int, default=None)
     parser.add_argument("--dynamics-hidden-dims", type=int, nargs='*', default=[200, 200, 200, 200])
     parser.add_argument("--dynamics-weight-decay", type=float, nargs='*', default=[2.5e-5, 5e-5, 7.5e-5, 7.5e-5, 1e-4])
     parser.add_argument("--n-ensemble", type=int, default=7)
@@ -66,9 +75,9 @@ def train(args=get_args()):
     # create env and dataset
     env = gym.make(args.task)
     dataset = qlearning_dataset(env)
-    if 'human' in args.task or 'cloned' in args.task:
-        min, max = dataset["rewards"].min(), dataset["rewards"].max()
-        dataset["rewards"] = (dataset["rewards"] - min) / (max - min)
+    if args.norm_reward:
+        r_mean, r_std = dataset["rewards"].mean(), dataset["rewards"].std()
+        dataset["rewards"] = (dataset["rewards"] - r_mean) / (r_std + 1e-3)
 
     args.obs_shape = env.observation_space.shape
     args.action_dim = np.prod(env.action_space.shape)
@@ -155,7 +164,8 @@ def train(args=get_args()):
         alpha=alpha,
         penalty_coef=args.penalty_coef,
         num_samples=args.num_samples,
-        deterministic_backup=True
+        deterministic_backup=args.deterministic_backup,
+        max_q_backup=args.max_q_backup
     )
 
     # create buffer
@@ -207,8 +217,14 @@ def train(args=get_args()):
     )
 
     # train
+    # train
     if not load_dynamics_model:
-        dynamics.train(real_buffer.sample_all(), logger, max_epochs_since_update=args.max_epochs_since_update)
+        dynamics.train(
+            real_buffer.sample_all(),
+            logger,
+            max_epochs_since_update=args.max_epochs_since_update,
+            max_epochs=args.dynamics_max_epochs
+        )
     
     policy_trainer.train()
 
