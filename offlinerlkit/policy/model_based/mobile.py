@@ -13,7 +13,7 @@ from offlinerlkit.dynamics import BaseDynamics
 
 class MOBILEPolicy(BasePolicy):
     """
-    Model-Bellman Inconsistancy Penalized Offline Reinforcement Learning
+    Model-Bellman Inconsistancy Penalized Offline Reinforcement Learning <Ref: https://proceedings.mlr.press/v202/sun23q.html>
     """
 
     def __init__(
