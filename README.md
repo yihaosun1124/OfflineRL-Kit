@@ -27,6 +27,7 @@ OfflineRL-Kit is an offline reinforcement learning library based on pure PyTorch
     - [Model-based Offline Policy Optimization (MOPO)](https://arxiv.org/abs/2005.13239)
     - [Conservative Offline Model-Based Policy Optimization (COMBO)](https://arxiv.org/abs/2102.08363)
     - [Robust Adversarial Model-Based Offline Reinforcement Learning (RAMBO)](https://arxiv.org/abs/2204.12581)
+    - [Model-Bellman Inconsistancy Penalized Offline Reinforcement Learning (MOBILE)](https://proceedings.mlr.press/v202/sun23q.html)
 
 ## Benchmark Results (4 seeds) (Ongoing)
 
@@ -45,7 +46,16 @@ OfflineRL-Kit is an offline reinforcement learning library based on pure PyTorch
 Detailed logs can be viewed in <https://drive.google.com/drive/folders/11QHHDlLmUEc097tPgYvb4gZ2IaqSpkHp?usp=share_link>.
 
 ## Installation
+First, install MuJuCo engine, which can be download from [here](https://mujoco.org/download), and install `mujoco-py` (its version depends on the version of MuJoCo engine you have installed).
 
+Second, install D4RL:
+```shell
+git clone https://github.com/Farama-Foundation/d4rl.git
+cd d4rl
+pip install -e .
+```
+
+Finally, install our OfflineRL-Kit!
 ```shell
 git clone https://github.com/yihaosun1124/OfflineRL-Kit.git
 cd OfflineRL-Kit

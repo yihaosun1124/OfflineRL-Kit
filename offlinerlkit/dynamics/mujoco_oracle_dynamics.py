@@ -25,6 +25,7 @@ class MujocoOracleDynamics(object):
     ) -> Tuple[np.ndarray, float, bool, Dict]:
         if (len(obs.shape) > 1) or (len(action.shape) > 1):
             raise ValueError
+        self.env.reset()
         self._set_state_from_obs(obs)
         next_obs, reward, terminal, info = self.env.step(action)
         return next_obs, reward, terminal, info
