@@ -9,6 +9,7 @@ class MujocoOracleDynamics(object):
         self.env = env
 
     def _set_state_from_obs(self, obs:np.ndarray) -> None:
+        self.env.reset()
         if len(obs) == (self.env.model.nq + self.env.model.nv - 1):
             xpos = np.zeros(1)
             obs = np.concatenate([xpos, obs])
