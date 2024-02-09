@@ -69,7 +69,8 @@ def train(args=get_args()):
         latent_dim=getattr(actor_backbone, "output_dim"),
         output_dim=args.action_dim,
         unbounded=True,
-        conditioned_sigma=True
+        conditioned_sigma=True,
+        max_mu=args.max_action
     )
     actor = ActorProb(actor_backbone, dist, args.device)
     critic1 = Critic(critic1_backbone, args.device)

@@ -61,7 +61,7 @@ def train(args=get_args()):
 
     # create policy model
     actor_backbone = MLP(input_dim=np.prod(args.obs_shape), hidden_dims=[256, 256])
-    actor = Actor(actor_backbone, args.action_dim, device=args.device)
+    actor = Actor(actor_backbone, args.action_dim, max_action=args.max_action, device=args.device)
     actor_optim = torch.optim.Adam(actor.parameters(), lr=args.actor_lr)
 
     # create policy

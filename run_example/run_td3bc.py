@@ -82,7 +82,7 @@ def train(args=get_args()):
     actor_backbone = MLP(input_dim=np.prod(args.obs_shape), hidden_dims=[256, 256])
     critic1_backbone = MLP(input_dim=np.prod(args.obs_shape)+args.action_dim, hidden_dims=[256, 256])
     critic2_backbone = MLP(input_dim=np.prod(args.obs_shape)+args.action_dim, hidden_dims=[256, 256])
-    actor = Actor(actor_backbone, args.action_dim, device=args.device)
+    actor = Actor(actor_backbone, args.action_dim, max_action=args.max_action, device=args.device)
 
     critic1 = Critic(critic1_backbone, args.device)
     critic2 = Critic(critic2_backbone, args.device)

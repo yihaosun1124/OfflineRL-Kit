@@ -15,17 +15,22 @@ class NormalWrapper(torch.distributions.Normal):
 
 
 class TanhNormalWrapper(torch.distributions.Normal):
+    def __init__(self, loc, scale, max_action):
+        super().__init__(loc, scale)
+        self._max_action = max_action
+
     def log_prob(self, action, raw_action=None):
+        squashed_action = action/self._max_action
         if raw_action is None:
-            raw_action = self.arctanh(action)
+            raw_action = self.arctanh(squashed_action)
         log_prob = super().log_prob(raw_action).sum(-1, keepdim=True)
         eps = 1e-6
-        log_prob = log_prob - torch.log((1 - action.pow(2)) + eps).sum(-1, keepdim=True)
+        log_prob = log_prob - torch.log(self._max_action*(1 - squashed_action.pow(2)) + eps).sum(-1, keepdim=True)
         return log_prob
 
     def mode(self):
         raw_action = self.mean
-        action = torch.tanh(self.mean)
+        action = self._max_action * torch.tanh(self.mean)
         return action, raw_action
 
     def arctanh(self, x):
@@ -35,7 +40,7 @@ class TanhNormalWrapper(torch.distributions.Normal):
 
     def rsample(self):
         raw_action = super().rsample()
-        action = torch.tanh(raw_action)
+        action = self._max_action * torch.tanh(raw_action)
         return action, raw_action
 
 
@@ -106,4 +111,4 @@ class TanhDiagGaussian(DiagGaussian):
             shape = [1] * len(mu.shape)
             shape[1] = -1
             sigma = (self.sigma_param.view(shape) + torch.zeros_like(mu)).exp()
-        return TanhNormalWrapper(mu, sigma)
+        return TanhNormalWrapper(mu, sigma, self._max)
