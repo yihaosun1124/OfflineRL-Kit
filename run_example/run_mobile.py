@@ -21,7 +21,19 @@ from offlinerlkit.policy import MOBILEPolicy
 
 
 """
-suggested hypers can been seen in "https://github.com/yihaosun1124/mobile/tree/main/configs"
+suggested hypers
+halfcheetah-random-v2: rollout-length=5, penalty-coef=0.5
+hopper-random-v2: rollout-length=5, penalty-coef=5.0
+walker2d-random-v2: rollout-length=5, penalty-coef=2.0
+halfcheetah-medium-v2: rollout-length=5, penalty-coef=0.5
+hopper-medium-v2: rollout-length=5, penalty-coef=1.5 auto-alpha=False
+walker2d-medium-v2: rollout-length=5, penalty-coef=0.5
+halfcheetah-medium-replay-v2: rollout-length=5, penalty-coef=0.1
+hopper-medium-replay-v2: rollout-length=5, penalty-coef=0.1
+walker2d-medium-replay-v2: rollout-length=1, penalty-coef=0.5
+halfcheetah-medium-expert-v2: rollout-length=5, penalty-coef=2.0
+hopper-medium-expert-v2: rollout-length=5, penalty-coef=1.5
+walker2d-medium-expert-v2: rollout-length=1, penalty-coef=1.5
 """
 
 
@@ -41,13 +53,13 @@ def get_args():
     parser.add_argument("--alpha-lr", type=float, default=1e-4)
 
     parser.add_argument("--num-q-ensemble", type=int, default=2)
-    parser.add_argument("--deterministic-backup", type=bool, default=False)
+    parser.add_argument("--deterministic-backup", type=bool, default=True)
     parser.add_argument("--max-q-backup", type=bool, default=False)
     parser.add_argument("--norm-reward", type=bool, default=False)
 
     parser.add_argument("--dynamics-lr", type=float, default=1e-3)
     parser.add_argument("--max-epochs-since-update", type=int, default=5)
-    parser.add_argument("--dynamics-max-epochs", type=int, default=None)
+    parser.add_argument("--dynamics-max-epochs", type=int, default=30)
     parser.add_argument("--dynamics-hidden-dims", type=int, nargs='*', default=[200, 200, 200, 200])
     parser.add_argument("--dynamics-weight-decay", type=float, nargs='*', default=[2.5e-5, 5e-5, 7.5e-5, 7.5e-5, 1e-4])
     parser.add_argument("--n-ensemble", type=int, default=7)
@@ -217,7 +229,6 @@ def train(args=get_args()):
         lr_scheduler=lr_scheduler
     )
 
-    # train
     # train
     if not load_dynamics_model:
         dynamics.train(

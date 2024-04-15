@@ -12,11 +12,11 @@ setup(
         packages=find_packages(),
         platforms=["all"],
         install_requires=[
-            "gym>=0.23.1,<=0.24.1",
+            "gym>=0.15.4,<=0.24.1",
             "matplotlib",
             "numpy",
             "pandas",
-            "ray==1.13.0",
+            # "ray==1.13.0",
             "torch",
             "tensorboard",
             "tqdm",
