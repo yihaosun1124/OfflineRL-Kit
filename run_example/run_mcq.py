@@ -10,7 +10,6 @@ import torch
 
 from offlinerlkit.nets import MLP, VAE
 from offlinerlkit.modules import ActorProb, Critic, TanhDiagGaussian
-from offlinerlkit.utils.load_dataset import qlearning_dataset
 from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MFPolicyTrainer
@@ -46,7 +45,7 @@ def get_args():
 def train(args=get_args()):
     # create env and dataset
     env = gym.make(args.task)
-    dataset = qlearning_dataset(env)
+    dataset = d4rl.qlearning_dataset(env)
     if 'antmaze' in args.task:
         dataset["rewards"] -= 1.0
     args.obs_shape = env.observation_space.shape

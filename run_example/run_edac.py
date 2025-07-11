@@ -10,7 +10,6 @@ import torch
 
 from offlinerlkit.nets import MLP
 from offlinerlkit.modules import ActorProb, EnsembleCritic, TanhDiagGaussian
-from offlinerlkit.utils.load_dataset import qlearning_dataset
 from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MFPolicyTrainer
@@ -64,7 +63,7 @@ def get_args():
 def train(args=get_args()):
     # create env and dataset
     env = gym.make(args.task)
-    dataset = qlearning_dataset(env)
+    dataset = d4rl.qlearning_dataset(env)
     if args.normalize_reward:
         mu, std = dataset["rewards"].mean(), dataset["rewards"].std()
         dataset["rewards"] = (dataset["rewards"] - mu) / (std + 1e-3)

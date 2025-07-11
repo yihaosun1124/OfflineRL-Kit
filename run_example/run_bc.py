@@ -10,7 +10,6 @@ import torch
 
 from offlinerlkit.nets import MLP
 from offlinerlkit.modules import Actor
-from offlinerlkit.utils.load_dataset import qlearning_dataset
 from offlinerlkit.buffer import ReplayBuffer
 from offlinerlkit.utils.logger import Logger, make_log_dirs
 from offlinerlkit.policy_trainer import MFPolicyTrainer
