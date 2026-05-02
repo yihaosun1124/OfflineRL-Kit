@@ -19,7 +19,7 @@ from offlinerlkit.policy import BCPolicy
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo-name", type=str, default="bc")
-    parser.add_argument("--task", type=str, default="hopper-medium-v2")
+    parser.add_argument("--task", type=str, default="halfcheetah-expert-v2")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--actor-lr", type=float, default=3e-4)
     parser.add_argument("--epoch", type=int, default=200)

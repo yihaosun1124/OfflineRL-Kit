@@ -16,6 +16,9 @@ OfflineRL-Kit is an offline reinforcement learning library based on pure PyTorch
 - Support parallel tuning, very convenient for researchers
 - Clear and powerful log system, easy to manage experiments
 
+> 🆕 Check out our new project: [VLARLKit](https://github.com/VLARLKit/VLARLKit) 
+> for VLA reinforcement learning.
+
 ## Supported algorithms
 - Model-free
     - [Conservative Q-Learning (CQL)](https://arxiv.org/abs/2006.04779)
