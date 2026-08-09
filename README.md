@@ -243,7 +243,7 @@ python run_example/plotter.py --algos "mopo" "cql" --task "hopper-medium-replay-
 If you use OfflineRL-Kit in your work, please use the following bibtex
 ```tex
 @misc{offinerlkit,
-  author = {Yihao Sun},
+  author = {Yihao Sun, Zhilong Zhang},
   title = {OfflineRL-Kit: An Elegant PyTorch Offline Reinforcement Learning Library},
   year = {2023},
   publisher = {GitHub},
